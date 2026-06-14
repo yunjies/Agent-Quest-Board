@@ -20,6 +20,25 @@ English README: [README.en.md](README.en.md)
 - 只有 `approved` 后任务才可以 `closed`；失败、驳回、返工、等待人工都不关闭。
 - 甲方/乙方/公告板共享 `board_protocol_version`，只有协议兼容才能对接。
 
+## 分层边界
+
+```text
+protocol/                 协议层：schema、版本、兼容矩阵、fixtures
+packages/board-core/      引擎层：状态机、权限、事件、生命周期规则
+packages/principal-sdk/   甲方通用 SDK：评分、开单 payload
+packages/contractor-sdk/  乙方通用 SDK：预留给接单、提交、返工能力
+adapters/                 适配器层：文件系统、Codex、Lark、AgentOps 等平台翻译
+apps/                     应用层：甲方实现、乙方实现、公告板前端 interface
+examples/                 接入样例：最小协议样例和真实集成样例
+```
+
+后续开发原则：
+
+- 开发甲方：优先在 `apps/principal/*`，必要时补 `adapters/*`。
+- 开发乙方：优先在 `apps/contractor/*`，必要时补 `adapters/*`。
+- 开发公告板前端 interface：优先在 `apps/board-interface/*` 和对应 frontend adapter。
+- 只有新增协议字段、状态机规则、权限模型、生命周期语义时，才修改 `protocol/` 或 `packages/board-core/`。
+
 ## 当前 v1 分工
 
 - **Codex**：负责框架、协议、基建、测试、甲方 Principal 接入。

@@ -47,6 +47,14 @@ blocked_reason
 
 多多侧负责 Hermes 执行适配、乙方身份注册、任务领取、结果提交、返工提交。
 
+当前应用入口：
+
+```text
+apps/contractor/hermes-contractor
+```
+
+乙方应用应通过公告板 lifecycle/API 领取任务、提交结果和返工，不应绕过公告板直接改状态或关闭任务。
+
 ## 乙方边界
 
 - 只能提交分配给自己的任务。

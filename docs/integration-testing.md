@@ -21,6 +21,24 @@
 - Observer 或 filesystem fallback 可查看任务。
 - 甲方、乙方、公告板各自接口均可单独 smoke。
 
+当前 smoke 入口：
+
+```text
+scripts/run-tests.ps1
+apps/principal/codex-principal/run-smoke.ps1
+apps/contractor/hermes-contractor/run-smoke.ps1
+apps/board-interface/lark-topic-board/run-smoke.ps1
+```
+
+POSIX shell 对应：
+
+```text
+scripts/run-tests.sh
+apps/principal/codex-principal/run-smoke.sh
+apps/contractor/hermes-contractor/run-smoke.sh
+apps/board-interface/lark-topic-board/run-smoke.sh
+```
+
 ## 用例 1：正常通过
 
 步骤：
@@ -92,6 +110,8 @@
 - 核心流程不依赖飞书。
 - task/events/artifacts 完整。
 - observer 能查看全流程。
+
+当前无飞书链路由 `packages/board-core/agent_delegation_board/lifecycle.py` + `adapters/filesystem` 支撑。
 
 ## 用例 5：异常与恢复
 

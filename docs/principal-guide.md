@@ -50,8 +50,11 @@ Codex PC = principal-codex-pc
 
 Codex 侧当前实现范围：
 
+- `apps/principal/codex-principal`：Codex 甲方应用入口。
 - `packages/principal-sdk`：任务评分、验收等级选择、任务 payload 构建。
 - `adapters/codex-local`：本地生成标准委托任务 JSON。
+
+甲方应用应通过公告板 lifecycle/API 发布任务和提交验收结果，不应直接修改 task snapshot 或直接关闭任务。
 
 ## 甲方边界
 

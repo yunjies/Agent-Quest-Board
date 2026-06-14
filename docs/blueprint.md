@@ -45,6 +45,64 @@ Agent委托公告板是一个协议优先的 Agent 委托协作框架。它把 A
 - artifact 索引可追踪。
 - observer 或 filesystem 前端可查看完整链路。
 
+## 分层设计
+
+```text
+protocol/                 协议层
+packages/board-core/      引擎层
+adapters/                 适配器层
+apps/                     应用层
+examples/                 接入案例
+```
+
+### 协议层
+
+协议层定义跨 Agent、跨平台的稳定契约：
+
+- `board_protocol_version`
+- JSON schema
+- compatibility matrix
+- fixtures
+- capability 名称
+
+### 引擎层
+
+引擎层只处理确定性规则：
+
+- 状态机。
+- 权限校验。
+- 事件类型。
+- 协议校验。
+- 任务生命周期。
+
+当前任务生命周期已抽到：
+
+```text
+packages/board-core/agent_delegation_board/lifecycle.py
+```
+
+它不依赖 filesystem、Lark、Codex、Hermes 或 AgentOps。
+
+### 适配器层
+
+适配器层负责把外部平台翻译成协议读写：
+
+- filesystem 落盘。
+- Codex 本地开单。
+- Lark 话题同步。
+- AgentOps 本地运行目录。
+- 未来数据库、Web、队列等。
+
+### 应用层
+
+应用层负责可运行组合：
+
+- `apps/principal/*`
+- `apps/contractor/*`
+- `apps/board-interface/*`
+
+甲方、乙方、公告板前端 interface 的具体开发应优先落在 `apps/`。只有协议或引擎语义变化时，才修改 `protocol/` 或 `packages/board-core/`。
+
 ## 状态机
 
 任务只能沿合法状态流转：

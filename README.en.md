@@ -14,6 +14,20 @@ The framework has three runtime roles:
 
 The board is designed to be zero-agent: it should not call an LLM, interpret task content, execute task work, or review quality. Intelligent work belongs to Principal and Contractor agents.
 
+## Layering
+
+```text
+protocol/                 Schemas, versions, compatibility matrix, fixtures
+packages/board-core/      Engine: state machine, permissions, events, lifecycle
+packages/principal-sdk/   Principal SDK: scoring and task payload building
+packages/contractor-sdk/  Contractor SDK placeholder
+adapters/                 Platform adapters
+apps/                     Runnable principal, contractor, and board-interface apps
+examples/                 Minimal and integration examples
+```
+
+Application work should normally happen under `apps/` and `adapters/`. Change `protocol/` or `packages/board-core/` only when protocol fields, state rules, permission semantics, or lifecycle semantics change.
+
 ## Repository Layout
 
 ```text

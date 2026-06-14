@@ -56,6 +56,26 @@ board/ratings/*
 
 多多侧负责承载公告板运行时和飞书公告板适配，但必须保持 board identity 与 contractor identity 隔离。
 
+当前前端 interface 入口：
+
+```text
+apps/board-interface/lark-topic-board
+```
+
+当前平台无关生命周期规则：
+
+```text
+packages/board-core/agent_delegation_board/lifecycle.py
+```
+
+当前 filesystem 事实源适配：
+
+```text
+adapters/filesystem
+```
+
+Lark、AgentOps、数据库或其他公告板承载实现应复用同一个 lifecycle API，不应另写一套状态流转。
+
 ## zero-agent 边界
 
 公告板必须保持 zero-agent：
