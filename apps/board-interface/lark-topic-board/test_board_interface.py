@@ -23,9 +23,9 @@ class LarkTopicBoardTest(unittest.TestCase):
 
     def test_assign_and_get_topic(self):
         board = LarkTopicBoard(mapping_store=tempfile.mktemp(suffix=".json"))
-        board.assign_topic("task-001", "oc_topic_123")
+        board.assign_topic("task-001", "example-topic-123")
         entry = board.get_topic_for_task("task-001")
-        self.assertEqual(entry["topic_id"], "oc_topic_123")
+        self.assertEqual(entry["topic_id"], "example-topic-123")
         self.assertEqual(entry["status"], "active")
 
     def test_topic_active_check(self):
@@ -35,7 +35,7 @@ class LarkTopicBoardTest(unittest.TestCase):
 
     def test_close_topic_marks_closed(self):
         board = LarkTopicBoard(mapping_store=tempfile.mktemp(suffix=".json"))
-        board.assign_topic("task-001", "oc_topic_123")
+        board.assign_topic("task-001", "example-topic-123")
         self.assertTrue(board.is_topic_active("task-001"))
         board.close_topic("task-001")
         self.assertFalse(board.is_topic_active("task-001"))
@@ -46,12 +46,12 @@ class LarkTopicBoardTest(unittest.TestCase):
             store = Path(tmp) / "topic-map.json"
             # Write
             board = LarkTopicBoard(mapping_store=str(store))
-            board.assign_topic("task-001", "oc_topic_123")
-            board.assign_topic("task-002", "oc_topic_456")
+            board.assign_topic("task-001", "example-topic-123")
+            board.assign_topic("task-002", "example-topic-456")
             board.close_topic("task-002")
             # Read back in new instance
             board2 = LarkTopicBoard(mapping_store=str(store))
-            self.assertEqual(board2.get_topic_for_task("task-001")["topic_id"], "oc_topic_123")
+            self.assertEqual(board2.get_topic_for_task("task-001")["topic_id"], "example-topic-123")
             self.assertEqual(board2.get_topic_for_task("task-002")["status"], "closed")
 
     # ── 事件路由 ──────────────────────────────────────────
@@ -90,14 +90,14 @@ class LarkTopicBoardTest(unittest.TestCase):
 
     def test_review_approved_notification(self):
         board = LarkTopicBoard(mapping_store=tempfile.mktemp(suffix=".json"))
-        board.assign_topic("task-001", "oc_topic_123")
+        board.assign_topic("task-001", "example-topic-123")
         event = _event("review_approved")
         task = {"task_id": "task-001", "title": "My task"}
         notif = board.handle_event(event, task=task)
 
         self.assertIsNotNone(notif)
         self.assertTrue(notif["pending_close"])
-        self.assertEqual(notif["topic_id"]["topic_id"], "oc_topic_123")
+        self.assertEqual(notif["topic_id"]["topic_id"], "example-topic-123")
 
     def test_task_closed_notification(self):
         board = LarkTopicBoard(mapping_store=tempfile.mktemp(suffix=".json"))

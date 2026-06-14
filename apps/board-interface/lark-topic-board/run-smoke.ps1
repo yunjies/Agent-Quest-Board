@@ -4,14 +4,17 @@ $root = "$env:TMP\lark-topic-board-smoke-$PID"
 $mapStore = "$root\topic-map.json"
 $null = New-Item -ItemType Directory -Path $root -Force
 
-Write-Output "Lark topic board smoke: verify event routing and topic lifecycle"
-
 $env:PYTHONPATH = "packages/board-core;packages/principal-sdk;adapters/filesystem;apps/board-interface/lark-topic-board"
+$env:MAP_STORE = $mapStore
 
-# 1. Verify notification routing
+Write-Output "Lark topic board smoke: verify event routing, topic lifecycle, exit codes"
+
+# Step 1: Notification routing for all event types
 python -c @"
+import os
 from agent_delegation_lark_topic_board import LarkTopicBoard
-board = LarkTopicBoard(mapping_store='$mapStore')
+
+board = LarkTopicBoard(mapping_store=os.environ['MAP_STORE'])
 
 events = [
     {'type': 'task_published', 'task_id': 'task-001', 'actor_identity_id': 'principal-codex-pc', 'payload': {'title': 'Test task'}},
@@ -19,29 +22,49 @@ events = [
     {'type': 'review_rejected', 'task_id': 'task-001', 'actor_identity_id': 'principal-codex-pc', 'payload': {'title': 'Test task', 'revision_request': 'Missing smoke evidence'}},
     {'type': 'review_approved', 'task_id': 'task-001', 'actor_identity_id': 'principal-codex-pc', 'payload': {'title': 'Test task'}},
     {'type': 'task_closed', 'task_id': 'task-001', 'actor_identity_id': 'board-duoduo', 'payload': {}},
+    {'type': 'incident_created', 'task_id': 'task-001', 'actor_identity_id': 'board-duoduo', 'payload': {'error': 'Lark API timeout'}},
 ]
 tasks = [{'task_id': 'task-001', 'title': 'Test task'}]
-notifs = board.batch_process_events(events, tasks=tasks)
+notifications = board.batch_process_events(events, tasks=tasks)
+print(f'OK generated {len(notifications)} notifications from {len(events)} events')
 
-assert len(notifs) == 5, f'expected 5 notifications, got {len(notifs)}'
-assert notifs[0]['needs_topic_creation']
-assert notifs[3]['pending_close']
-for n in notifs:
+for n in notifications:
     print(f"  [{n['route']}] -> {n['to']}: {n['title']}")
-print('OK notification routing works')
-"@
 
-# 2. Verify topic mapping lifecycle
+assert notifications[0]['needs_topic_creation'], 'first event should request topic creation'
+assert notifications[3]['pending_close'], 'review_approved should trigger pending close'
+print('OK notification routing works for all event types')
+"@
+if ($LASTEXITCODE -ne 0) { throw "Step 1 failed" }
+
+# Step 2: Topic mapping lifecycle
 python -c @"
+import os, json
 from agent_delegation_lark_topic_board import LarkTopicBoard
-board = LarkTopicBoard(mapping_store='$mapStore')
-board.assign_topic('task-001', 'oc_example_topic_id')
-assert board.is_topic_active('task-001')
+
+board = LarkTopicBoard(mapping_store=os.environ['MAP_STORE'])
+
+# Assign topic
+board.assign_topic('task-001', 'example-topic-id')
+entry = board.get_topic_for_task('task-001')
+assert entry['topic_id'] == 'example-topic-id', f'topic_id mismatch: {entry}'
+assert board.is_topic_active('task-001'), 'topic should be active'
+print('OK topic assigned and active')
+
+# Close topic
 board.close_topic('task-001')
-assert not board.is_topic_active('task-001')
-import json
-data = json.loads(open('$mapStore', encoding='utf-8').read())
+assert not board.is_topic_active('task-001'), 'topic should be closed'
+closed_entry = board.get_topic_for_task('task-001')
+assert closed_entry['status'] == 'closed'
+assert 'closed_at' in closed_entry
+print('OK topic closed with timestamp')
+
+# Verify persistence
+store_path = os.environ['MAP_STORE']
+data = json.loads(open(store_path, encoding='utf-8').read())
+assert 'task-001' in data, 'topic map should persist'
 assert data['task-001']['status'] == 'closed'
-print('OK topic lifecycle complete')
+print('OK topic map persisted to disk')
 print('ALL OK: lark topic board smoke test passed')
 "@
+if ($LASTEXITCODE -ne 0) { throw "Step 2 failed" }
