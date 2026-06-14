@@ -10,7 +10,8 @@ $env:MAP_STORE = $mapStore
 Write-Output "Lark topic board smoke: verify event routing, topic lifecycle, exit codes"
 
 # Step 1: Notification routing for all event types
-python -c @"
+$step1 = "$root\step1_notifications.py"
+@'
 import os
 from agent_delegation_lark_topic_board import LarkTopicBoard
 
@@ -26,19 +27,22 @@ events = [
 ]
 tasks = [{'task_id': 'task-001', 'title': 'Test task'}]
 notifications = board.batch_process_events(events, tasks=tasks)
-print(f'OK generated {len(notifications)} notifications from {len(events)} events')
+count = len(notifications)
+print('OK generated ' + str(count) + ' notifications from ' + str(len(events)) + ' events')
 
 for n in notifications:
-    print(f"  [{n['route']}] -> {n['to']}: {n['title']}")
+    print("  [" + n['route'] + "] -> " + n['to'] + ": " + n['title'])
 
 assert notifications[0]['needs_topic_creation'], 'first event should request topic creation'
 assert notifications[3]['pending_close'], 'review_approved should trigger pending close'
 print('OK notification routing works for all event types')
-"@
+'@ | Set-Content -Path $step1 -Encoding UTF8
+python $step1
 if ($LASTEXITCODE -ne 0) { throw "Step 1 failed" }
 
 # Step 2: Topic mapping lifecycle
-python -c @"
+$step2 = "$root\step2_lifecycle.py"
+@'
 import os, json
 from agent_delegation_lark_topic_board import LarkTopicBoard
 
@@ -47,7 +51,7 @@ board = LarkTopicBoard(mapping_store=os.environ['MAP_STORE'])
 # Assign topic
 board.assign_topic('task-001', 'example-topic-id')
 entry = board.get_topic_for_task('task-001')
-assert entry['topic_id'] == 'example-topic-id', f'topic_id mismatch: {entry}'
+assert entry['topic_id'] == 'example-topic-id', 'topic_id mismatch: ' + str(entry)
 assert board.is_topic_active('task-001'), 'topic should be active'
 print('OK topic assigned and active')
 
@@ -66,5 +70,9 @@ assert 'task-001' in data, 'topic map should persist'
 assert data['task-001']['status'] == 'closed'
 print('OK topic map persisted to disk')
 print('ALL OK: lark topic board smoke test passed')
-"@
+'@ | Set-Content -Path $step2 -Encoding UTF8
+python $step2
 if ($LASTEXITCODE -ne 0) { throw "Step 2 failed" }
+
+# Cleanup
+Remove-Item -Path $root -Recurse -Force
