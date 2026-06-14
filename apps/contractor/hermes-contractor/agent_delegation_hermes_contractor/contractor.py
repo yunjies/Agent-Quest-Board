@@ -104,6 +104,7 @@ class HermesContractor:
         """调用 lifecycle.submit_result。
 
         如果 task 正在 revision_requested 状态，先 transition 到 running。
+        execution_log 会写入 task snapshot 和 artifacts 中持久化。
         """
         task = self.store.load_active_task(task_id)
         if task.get("status") == "revision_requested":
@@ -112,13 +113,26 @@ class HermesContractor:
 
         if not result_file:
             result_file = str(self.results_dir / f"{task_id}-result.json")
-        return lifecycle_submit_result(
+
+        # 持久化 execution_log 到 task snapshot
+        if execution_log:
+            task["execution_log"] = execution_log
+            self.store.save_active_task(task)
+
+        # 将 execution_log 写入 artifacts 传递给 lifecycle
+        merged_artifacts = dict(artifacts or {})
+        if execution_log:
+            merged_artifacts["execution_log"] = execution_log
+
+        result = lifecycle_submit_result(
             self.store,
             task_id,
             self.identity_id,
             result_file,
-            artifacts or {},
+            merged_artifacts,
         )
+
+        return result
 
     # ── 异常处理 ──────────────────────────────────────────────
 

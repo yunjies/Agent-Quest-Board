@@ -157,6 +157,56 @@ class HermesContractorTest(unittest.TestCase):
             self.assertEqual(submitted["status"], "submitted")
             self.assertEqual(submitted.get("contractor_identity_id"), "contractor-duoduo")
 
+    def test_execution_log_persisted(self):
+        """execution_log 必须写入 task snapshot 和 artifacts/event。"""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _setup_board(root, "exec-log-task")
+            c = HermesContractor(root, results_dir=str(root / "results"), logs_dir=str(root / "logs"))
+            c.ensure_registered()
+            c.claim_task("exec-log-task")
+            c.start_execution("exec-log-task")
+
+            result = c.execute_task("exec-log-task")
+            c.submit_result(
+                "exec-log-task",
+                result_file=result["result_file"],
+                artifacts=result["artifacts"],
+                execution_log=result["execution_log"],
+            )
+
+            # 1. task snapshot 含 execution_log
+            snapshot = c.load_task("exec-log-task")
+            self.assertIn("execution_log", snapshot,
+                          f"execution_log missing in snapshot keys: {list(snapshot.keys())}")
+
+            # 2. result_submitted event payload artifacts 含 execution_log
+            events_dir = root / "events"
+            events_path = events_dir / "exec-log-task.jsonl"
+            events = [json.loads(l) for l in events_path.read_text(encoding="utf-8").splitlines()]
+            submitted_events = [e for e in events if e["type"] == "result_submitted"]
+            self.assertEqual(len(submitted_events), 1,
+                             f"expected 1 result_submitted event, got {len(submitted_events)}")
+            payload = submitted_events[0].get("payload", {})
+            artifacts = payload.get("artifacts", {})
+            self.assertIn("execution_log", artifacts,
+                          f"execution_log missing in event payload artifacts: {payload}")
+
+    def test_submit_without_execution_log_still_works(self):
+        """不传 execution_log 时应该正常工作，不抛异常。"""
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            _setup_board(root, "no-log-task")
+            c = HermesContractor(root, results_dir=str(root / "results"), logs_dir=str(root / "logs"))
+            c.ensure_registered()
+            c.claim_task("no-log-task")
+            c.start_execution("no-log-task")
+            result = c.execute_task("no-log-task")
+
+            # 不传 execution_log
+            submitted = c.submit_result("no-log-task", result_file=result["result_file"])
+            self.assertEqual(submitted["status"], "submitted")
+
     def test_blocked_on_no_context(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)

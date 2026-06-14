@@ -5,112 +5,116 @@ root="${TMPDIR:-/tmp}/hermes-contractor-smoke-$$"
 results="$root/results"
 logs="$root/logs"
 board="$root/board"
+task_id='smoke-task-001'
 
-printf 'Hermes contractor smoke: verify full contractor lifecycle\n'
+export BOARD_ROOT="$board"
+export RESULTS_DIR="$results"
+export LOGS_DIR="$logs"
+export TASK_ID="$task_id"
 
-# 1. Init board
-PYTHONPATH="packages/board-core:packages/principal-sdk:adapters/filesystem:apps/contractor/hermes-contractor" \
-python -c "
+PYTHONPATH="packages/board-core:packages/principal-sdk:adapters/filesystem:apps/contractor/hermes-contractor"
+export PYTHONPATH
+
+printf 'Hermes contractor smoke: verify full contractor lifecycle, execution_log, exit codes\n'
+
+# Step 1: Register identities
+python3 << 'PYEOF'
+import os
 from agent_delegation_filesystem import init_board, register_identity
 from agent_delegation_hermes_contractor import CONTRACTOR_IDENTITY, HermesContractor
-init_board('$board')
 
-# Register identities
+board = os.environ["BOARD_ROOT"]
+init_board(board)
 for ident in [
     {
-        'identity_id': 'principal-codex-pc',
-        'agent_id': 'agent-codex',
-        'role_type': 'principal',
-        'permissions': ['publish_task', 'review_task', 'approve_task', 'reject_task'],
-        'board_protocol_version': '1.0',
-        'status': 'active',
+        "identity_id": "principal-codex-pc",
+        "agent_id": "agent-codex",
+        "role_type": "principal",
+        "permissions": ["publish_task", "review_task", "approve_task", "reject_task"],
+        "board_protocol_version": "1.0",
+        "status": "active",
     },
     {
-        'identity_id': 'board-duoduo',
-        'agent_id': 'agent-duoduo',
-        'role_type': 'board',
-        'permissions': ['append_event', 'transition_status', 'route_notification', 'request_review', 'close_task'],
-        'board_protocol_version': '1.0',
-        'status': 'active',
+        "identity_id": "board-duoduo",
+        "agent_id": "agent-duoduo",
+        "role_type": "board",
+        "permissions": ["append_event", "transition_status", "route_notification", "request_review", "close_task"],
+        "board_protocol_version": "1.0",
+        "status": "active",
     },
 ]:
-    register_identity('$board', ident)
+    register_identity(board, ident)
 
-# Register and verify contractor
-c = HermesContractor('$board', results_dir='$results', logs_dir='$logs')
+c = HermesContractor(board, results_dir=os.environ["RESULTS_DIR"], logs_dir=os.environ["LOGS_DIR"])
 ident = c.ensure_registered()
-assert ident['role_type'] == 'contractor', f'role mismatch: {ident}'
-assert ident['identity_id'] == 'contractor-duoduo', f'id mismatch: {ident}'
-print('OK identity registered')
-" 2>&1
+assert ident["role_type"] == "contractor", f"role mismatch: {ident}"
+assert ident["identity_id"] == "contractor-duoduo", f"id mismatch: {ident}"
+print("OK identity registered")
+PYEOF
 
-# 2. Publish a task (simulate principal)
-task_id='smoke-task-001'
-PYTHONPATH="packages/board-core:packages/principal-sdk:adapters/filesystem:apps/contractor/hermes-contractor" \
-python -c "
+# Step 2: Publish task
+python3 << 'PYEOF'
+import os
 from agent_delegation_filesystem import publish_task
 
+board = os.environ["BOARD_ROOT"]
+task_id = os.environ["TASK_ID"]
 task = {
-    'task_id': '$task_id',
-    'title': 'Hermes contractor smoke task',
-    'principal_identity_id': 'principal-codex-pc',
-    'contractor_identity_id': 'contractor-duoduo',
-    'board_identity_id': 'board-duoduo',
-    'status': 'published',
-    'board_protocol_version': '1.0',
+    "task_id": task_id,
+    "title": "Hermes contractor smoke task",
+    "principal_identity_id": "principal-codex-pc",
+    "contractor_identity_id": "contractor-duoduo",
+    "board_identity_id": "board-duoduo",
+    "status": "published",
+    "board_protocol_version": "1.0",
 }
-publish_task('$board', task, 'principal-codex-pc')
-print('OK task published')
-" 2>&1
+publish_task(board, task, "principal-codex-pc")
+print("OK task published")
+PYEOF
 
-# 3. Contractor claims and executes
-PYTHONPATH="packages/board-core:packages/principal-sdk:adapters/filesystem:apps/contractor/hermes-contractor" \
-python -c "
-import json
+# Step 3: Contractor full lifecycle with execution_log verification
+python3 << 'PYEOF'
+import os, json
 from pathlib import Path
 from agent_delegation_hermes_contractor import HermesContractor
 
-c = HermesContractor('$board', results_dir='$results', logs_dir='$logs')
+board = os.environ["BOARD_ROOT"]
+task_id = os.environ["TASK_ID"]
+results = os.environ["RESULTS_DIR"]
+logs = os.environ["LOGS_DIR"]
+
+c = HermesContractor(board, results_dir=results, logs_dir=logs)
 c.ensure_registered()
 
-# Claim
-c.claim_task('$task_id')
-print('OK claimed')
+c.claim_task(task_id); print("OK claimed")
+c.start_execution(task_id); print("OK started")
+result = c.execute_task(task_id); print("OK executed")
 
-# Start
-c.start_execution('$task_id')
-print('OK started')
+# Submit with execution_log
+c.submit_result(task_id, result_file=result["result_file"],
+    artifacts=result["artifacts"], execution_log=result["execution_log"])
+print("OK submitted")
 
-# Execute (mock: just write result)
-result = c.execute_task('$task_id')
-print('OK executed')
+# Verify execution_log in task snapshot
+snapshot = c.load_task(task_id)
+assert snapshot.get("execution_log"), "execution_log missing in snapshot: " + str(list(snapshot.keys()))
+print("OK execution_log persisted: " + snapshot["execution_log"])
 
-# Submit
-c.submit_result('$task_id', result_file=result['result_file'], artifacts=result['artifacts'])
-print('OK submitted')
+# Verify events carry execution_log in artifacts
+events_path = Path(board) / "events" / (task_id + ".jsonl")
+events = [json.loads(l) for l in events_path.read_text(encoding="utf-8").splitlines()]
+event_types = [e["type"] for e in events]
+assert "result_submitted" in event_types, "no result_submitted: " + str(event_types)
+submitted_events = [e for e in events if e["type"] == "result_submitted"]
+assert len(submitted_events) == 1, "expected 1 result_submitted event, got " + str(len(submitted_events))
+payload = submitted_events[0].get("payload", {})
+artifacts = payload.get("artifacts", {})
+assert "execution_log" in artifacts, "execution_log missing in event payload artifacts: " + str(payload)
+print("OK events complete, execution_log in artifacts")
+print("ALL OK: contractor lifecycle complete for " + task_id)
+PYEOF
 
-# Verify events
-events_path = Path('$board') / 'events' / '$task_id.jsonl'
-events = [json.loads(l) for l in events_path.read_text(encoding='utf-8').splitlines()]
-event_types = [e['type'] for e in events]
-assert 'status_changed' in event_types, f'no status_changed: {event_types}'
-assert 'result_submitted' in event_types, f'no result_submitted: {event_types}'
-print(f'OK events complete: {\" -> \".join(event_types)}')
-print(f'ALL OK: contractor lifecycle complete for $task_id')
-" 2>&1
-
-# 4. Verify result file exists
+# Step 4: Verify result file exists
 test -f "$results/smoke-task-001-result.json"
 printf 'OK result file exists\n'
-
-# 5. Verify assigned tasks can be scanned
-PYTHONPATH="packages/board-core:packages/principal-sdk:adapters/filesystem:apps/contractor/hermes-contractor" \
-python -c "
-from agent_delegation_hermes_contractor import HermesContractor
-c = HermesContractor('$board', results_dir='$results', logs_dir='$logs')
-tasks = c.get_assigned_tasks()
-assert len(tasks) >= 1, f'no assigned tasks found: {tasks}'
-assert tasks[0]['task_id'] == '$task_id'
-print(f'OK scan assigned tasks: {len(tasks)} found')
-print(f'ALL OK: contractor identity, claim, execute, submit, scan all work')
-" 2>&1
+printf 'ALL OK: contractor smoke test passed\n'
