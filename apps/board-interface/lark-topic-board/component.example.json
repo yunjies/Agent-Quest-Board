@@ -1,0 +1,14 @@
+{
+  "component_id": "lark-topic-board-example",
+  "component_type": "frontend",
+  "implementation_version": "0.1.0",
+  "board_protocol_version": "1.0",
+  "supported_protocol_versions": ["1.0"],
+  "capabilities": [
+    "create_topic",
+    "route_notification",
+    "map_task_to_topic",
+    "close_topic",
+    "create_incident"
+  ]
+}
