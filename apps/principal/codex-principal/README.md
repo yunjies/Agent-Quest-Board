@@ -25,9 +25,17 @@ POSIX shell:
 sh apps/principal/codex-principal/run-smoke.sh
 ```
 
+当前 smoke 覆盖：
+
+```text
+publish task
+simulate contractor submit_result
+request_review
+Codex principal review approved
+board close_task
+```
+
 ## 后续扩展
 
 - 增加 review-ready 轮询或事件订阅。
-- 增加 Codex 验收结果写入。
-- 增加 contractor rating 写入。
 - 接入真实 AgentOps board root。
