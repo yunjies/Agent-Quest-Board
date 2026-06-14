@@ -1,0 +1,17 @@
+{
+  "component_id": "contractor-duoduo-example",
+  "component_type": "contractor",
+  "implementation_version": "0.1.0",
+  "board_protocol_version": "1.0",
+  "supported_protocol_versions": ["1.0"],
+  "capabilities": [
+    "claim_task",
+    "accept_assignment",
+    "start_execution",
+    "submit_result",
+    "request_clarification",
+    "mark_blocked",
+    "revise_task",
+    "resubmit_result"
+  ]
+}
