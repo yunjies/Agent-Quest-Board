@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Event",
+  "type": "object",
+  "required": ["event_id", "task_id", "type", "actor_identity_id", "timestamp"],
+  "properties": {
+    "event_id": {"type": "string"},
+    "task_id": {"type": "string"},
+    "type": {"type": "string"},
+    "actor_agent_id": {"type": "string"},
+    "actor_identity_id": {"type": "string"},
+    "timestamp": {"type": "string"},
+    "payload": {"type": "object"}
+  },
+  "additionalProperties": true
+}
+

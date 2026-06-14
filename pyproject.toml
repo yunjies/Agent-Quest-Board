@@ -1,0 +1,6 @@
+[project]
+name = "agent-delegation-board"
+version = "0.1.0"
+description = "Protocol-first delegation board for agent-to-agent task workflows"
+requires-python = ">=3.10"
+dependencies = []

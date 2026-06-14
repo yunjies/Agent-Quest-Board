@@ -1,0 +1,9 @@
+{
+  "component_id": "principal-example",
+  "component_type": "principal",
+  "implementation_version": "0.1.0",
+  "board_protocol_version": "1.0",
+  "supported_protocol_versions": ["1.0"],
+  "capabilities": ["publish_task", "review_task", "score_contractor"]
+}
+

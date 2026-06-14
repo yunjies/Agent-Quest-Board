@@ -1,0 +1,17 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Identity",
+  "type": "object",
+  "required": ["identity_id", "agent_id", "role_type", "permissions", "board_protocol_version", "status"],
+  "properties": {
+    "identity_id": {"type": "string"},
+    "agent_id": {"type": "string"},
+    "role_type": {"type": "string", "enum": ["principal", "contractor", "board"]},
+    "permissions": {"type": "array", "items": {"type": "string"}},
+    "board_protocol_version": {"type": "string"},
+    "implementation_version": {"type": "string"},
+    "status": {"type": "string", "enum": ["active", "disabled"]}
+  },
+  "additionalProperties": true
+}
+

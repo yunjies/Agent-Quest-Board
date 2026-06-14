@@ -1,0 +1,9 @@
+{
+  "component_id": "board-duoduo-example",
+  "component_type": "board",
+  "implementation_version": "0.1.0",
+  "board_protocol_version": "1.0",
+  "supported_protocol_versions": ["1.0"],
+  "capabilities": ["append_event", "transition_status", "route_notification"]
+}
+

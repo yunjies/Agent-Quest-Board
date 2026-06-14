@@ -1,0 +1,9 @@
+{
+  "component_id": "contractor-example",
+  "component_type": "contractor",
+  "implementation_version": "0.1.0",
+  "board_protocol_version": "1.0",
+  "supported_protocol_versions": ["1.0"],
+  "capabilities": ["claim_task", "submit_result"]
+}
+

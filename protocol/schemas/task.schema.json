@@ -1,0 +1,20 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Task",
+  "type": "object",
+  "required": ["task_id", "title", "principal_identity_id", "contractor_identity_id", "status", "board_protocol_version"],
+  "properties": {
+    "task_id": {"type": "string"},
+    "title": {"type": "string"},
+    "principal_identity_id": {"type": "string"},
+    "contractor_identity_id": {"type": "string"},
+    "board_identity_id": {"type": "string"},
+    "status": {"type": "string"},
+    "board_protocol_version": {"type": "string"},
+    "delegation_score": {"type": "integer", "minimum": 0, "maximum": 10},
+    "acceptance_level": {"type": "string", "enum": ["report_only", "smoke_required", "test_required"]},
+    "artifacts": {"type": "object"}
+  },
+  "additionalProperties": true
+}
+

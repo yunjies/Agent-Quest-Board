@@ -1,0 +1,15 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Agent",
+  "type": "object",
+  "required": ["agent_id", "display_name", "capabilities", "status"],
+  "properties": {
+    "agent_id": {"type": "string"},
+    "display_name": {"type": "string"},
+    "runtime": {"type": "string"},
+    "capabilities": {"type": "array", "items": {"type": "string"}},
+    "status": {"type": "string", "enum": ["active", "disabled"]}
+  },
+  "additionalProperties": true
+}
+

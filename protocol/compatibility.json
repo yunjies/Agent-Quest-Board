@@ -1,0 +1,14 @@
+{
+  "board_protocol_version": "1.0",
+  "compatible": {
+    "principal": ["1.0"],
+    "contractor": ["1.0"],
+    "board": ["1.0"]
+  },
+  "minimum_required_capabilities": {
+    "principal": ["publish_task", "review_task"],
+    "contractor": ["claim_task", "submit_result"],
+    "board": ["append_event", "transition_status", "route_notification"]
+  }
+}
+
