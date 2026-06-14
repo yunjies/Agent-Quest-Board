@@ -1,54 +1,52 @@
-# Development Ownership
+# Agent委托公告板｜开发分工
 
-This document defines who builds which part of the current v1 implementation.
+本文定义当前 v1 由谁开发哪一部分。仓库主要语言为中文；协议字段、代码标识符和跨实现接口保留英文。
 
-## Ownership Split
+## Codex 负责
 
-Codex owns:
+- 核心协议与 schema。
+- 公告板状态机规则。
+- 兼容矩阵与校验。
+- 共享 test fixtures 和自动化测试。
+- Principal SDK 与 Codex 甲方适配器。
+- Codex 本地验收与 review 接入。
+- 平台无关的 filesystem / AgentOps 读写抽象。
 
-- Core protocol and schemas.
-- Board state machine rules.
-- Compatibility matrix and validation.
-- Shared test fixtures and automated tests.
-- Principal SDK and Codex Principal adapter.
-- Local Codex review and acceptance integration.
-- Filesystem and AgentOps read/write abstractions that are platform-neutral.
+## 多多负责
 
-Duoduo owns:
+- 飞书话题公告板适配器。
+- `contractor-duoduo` 乙方身份注册与 Hermes 执行适配。
+- `board-duoduo` 公告板运行承载，并严格区分 board identity。
+- 委托公告板话题组通知路由。
+- Hermes 侧任务接收、执行、提交和返工链路。
 
-- Lark topic-board adapter.
-- Duoduo Contractor identity registration and Hermes execution adapter.
-- Duoduo Board runtime hosting, with strict board identity separation.
-- Lark notification routing into the delegation board topic group.
-- Hermes-side intake and execution plumbing.
-
-Shared contract:
+## 共享契约
 
 - `board_protocol_version`
-- JSON schemas under `protocol/schemas`
-- compatibility matrix under `protocol/compatibility.json`
-- integration tests under `tests/`
+- `protocol/schemas` 下的 JSON Schema
+- `protocol/compatibility.json` 兼容矩阵
+- `tests/` 下的协议与联调测试
 
-## Boundary Rules
+## 边界规则
 
-Core protocol must not import Codex, Duoduo, Lark, Hermes, or local AgentOps-specific code.
+核心协议不得 import Codex、多多、Lark、Hermes 或本地 AgentOps 特定代码。
 
-Adapters may depend on their platform, but they must translate platform behavior into protocol events and task snapshots.
+适配器可以依赖自己的平台，但必须把平台行为翻译成协议事件和任务快照。
 
-The board identity is zero-agent. Any LLM reasoning belongs to Principal or Contractor identities, never to Board core.
+公告板身份必须保持 zero-agent。所有 LLM 推理都属于甲方或乙方身份，不属于公告板核心。
 
-## Current v1 Mapping
+## 当前 v1 映射
 
 ```text
-principal-codex-pc -> implemented by Codex Principal adapter
-contractor-duoduo  -> implemented by Duoduo Hermes adapter
-board-duoduo       -> hosted by Duoduo, constrained by Board protocol
+principal-codex-pc -> Codex 甲方适配器实现
+contractor-duoduo  -> 多多 Hermes 乙方适配器实现
+board-duoduo       -> 多多承载，受公告板协议约束
 ```
 
-## Development Sequence
+## 开发顺序
 
-1. Codex completes protocol/core/test scaffold.
-2. Codex completes Principal SDK and Codex Principal adapter.
-3. Duoduo completes Lark adapter and Contractor/Hermes adapter.
-4. Both sides run compatibility tests against the same protocol version.
-5. Board accepts tasks only when Principal, Contractor, and Board versions are compatible.
+1. Codex 完成协议、核心库和测试骨架。
+2. Codex 完成 Principal SDK 和 Codex 甲方适配器。
+3. 多多完成 Lark adapter 和 Contractor/Hermes adapter。
+4. 双方基于同一协议版本运行兼容性测试。
+5. 公告板只接受协议兼容的甲方、乙方和公告板组件。

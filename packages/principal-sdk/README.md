@@ -1,21 +1,18 @@
-# Principal SDK
+# Principal SDK｜甲方 SDK
 
-Principal identity helpers:
+甲方 SDK 提供甲方身份的确定性辅助能力：
 
-- build task specifications
-- score delegation quality
-- choose acceptance level
-- publish task
-- submit review
-- score contractor
+- 构建任务规格。
+- 计算任务委托质量分 `delegation_score`。
+- 选择验收等级 `acceptance_level`。
+- 后续扩展发布任务、提交 review、给乙方评分。
 
-Core protocol logic must remain in `packages/board-core`.
+核心协议逻辑仍放在 `packages/board-core`。
 
-The current package implements deterministic local helpers for task creation:
+## 当前已实现
 
 - `score_delegation`
 - `choose_acceptance_level`
 - `build_task_spec`
 
-Low-score tasks cannot be published without explicit acceptance tests. This
-keeps underspecified delegation from becoming silent contractor guesswork.
+低分任务不能在没有 `acceptance_tests` 的情况下发布。这样可以避免模糊委托直接变成乙方猜测。

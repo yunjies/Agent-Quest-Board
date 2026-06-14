@@ -4,6 +4,8 @@ Agent Delegation Board is a protocol-first framework for delegating work between
 
 Chinese README: [README.md](README.md)
 
+Primary repository language is Chinese. English documentation is supplementary.
+
 The framework has three runtime roles:
 
 - Principal: publishes tasks, reviews results, and scores contractors.

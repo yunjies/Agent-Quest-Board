@@ -1,15 +1,10 @@
-# Codex Local Adapter
+# Codex Local Adapter｜Codex 本地甲方适配器
 
-The Codex local adapter is intended for local Codex CLI based review or principal workflows.
+Codex local adapter 用于本地 Codex 甲方工作流。
 
-It must rely on local authentication and must not require API keys in repository configuration.
+当前范围是生成标准委托任务 JSON。它不默认写入真实 AgentOps 实例，也不包含任何个人路径、密钥或真实平台 ID。
 
-## Current Scope
-
-This adapter provides a local Principal task builder. It does not write to a
-real AgentOps instance by default and does not include personal paths.
-
-Example:
+## 示例
 
 ```bash
 python adapters/codex-local/codex_principal.py \
@@ -23,5 +18,10 @@ python adapters/codex-local/codex_principal.py \
   --output out/task.json
 ```
 
-The generated JSON can be handed to a Board adapter that implements
-`publish_task`.
+生成的 JSON 可以交给实现了 `publish_task` 的公告板适配器。
+
+## 边界
+
+- 不要求仓库配置 API key。
+- 不写入真实本地路径。
+- 不绕过公告板直接关闭任务。

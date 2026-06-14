@@ -27,6 +27,12 @@ English README: [README.en.md](README.en.md)
 
 详细分工见：[docs/development-ownership.md](docs/development-ownership.md)
 
+## 语言约定
+
+本仓库主要语言为中文。面向开发者和使用者的主文档默认使用中文；代码标识符、JSON 字段名、schema、CLI 参数和 capability 名称保留英文。
+
+详细约定见：[docs/language-policy.md](docs/language-policy.md)
+
 ## 开发与测试
 
 Windows:

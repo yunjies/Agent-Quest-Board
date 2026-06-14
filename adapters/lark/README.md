@@ -1,6 +1,14 @@
-# Lark Adapter
+# Lark Adapter｜飞书前端适配器
 
-Lark is a frontend adapter. It is not the source of truth.
+Lark adapter 用于把公告板任务和事件同步到飞书话题、群聊或其他飞书前端。
 
-Do not store real chat IDs in this repository. Use local configuration in deployments.
+飞书不是事实源。事实源必须是公告板协议定义的任务快照、事件日志和 artifact 索引。
 
+## 边界
+
+- 不在公开仓库保存真实 chat_id、topic_id、open_id。
+- 不在公开仓库保存 app secret、token 或 API key。
+- 飞书同步失败不能破坏核心任务状态。
+- 飞书话题只展示和路由事件，不决定任务是否完成。
+
+当前 v1 的飞书适配由多多侧负责实现。
