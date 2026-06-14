@@ -1,4 +1,4 @@
-# Integration Testing
+# Integration Testing / 联调方案
 
 ## Normal Approve Path
 
@@ -28,3 +28,12 @@ Expected result: the same task ID is reused and the topic is not closed before a
 
 Disable frontend adapters and run the same lifecycle through filesystem persistence only. Core task state must remain complete.
 
+## 中文摘要
+
+联调目标是验证三方独立开发后能在同一协议下完成闭环：
+
+```text
+甲方发布 -> 公告板登记/建话题 -> 乙方执行 -> 公告板通知验收 -> 甲方验收 -> 公告板关闭或派回
+```
+
+必须覆盖正常通过、驳回返工、权限隔离、无飞书运行、异常与恢复五类用例。

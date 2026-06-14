@@ -1,6 +1,8 @@
-# Agent Delegation Board
+# Agent Delegation Board / Agent委托公告板
 
 Agent Delegation Board is a protocol-first framework for delegating work between agents.
+
+中文文档：[README.zh-CN.md](README.zh-CN.md)
 
 The framework has three runtime roles:
 
@@ -21,13 +23,43 @@ examples/             Example component manifests
 tests/                Protocol, compatibility, and integration tests
 ```
 
+## Development Ownership
+
+Current v1 development is split by role:
+
+- Codex owns the framework, core protocol, infrastructure, tests, and Codex Principal adapter.
+- Duoduo owns the Lark board frontend adapter, Contractor identity integration, and Hermes runtime adapter.
+- The Board protocol stays platform-independent and zero-agent.
+
+Details: [docs/development-ownership.md](docs/development-ownership.md)
+
 ## Version Compatibility
 
 Components declare a `board_protocol_version`. The board accepts interaction only when the principal, contractor, and board protocol versions are compatible according to `protocol/compatibility.json`.
 
 Implementation versions may differ. Protocol compatibility is the contract.
 
+## Development
+
+Run the test suite:
+
+```powershell
+scripts\run-tests.ps1
+```
+
+Or on POSIX shells:
+
+```bash
+sh scripts/run-tests.sh
+```
+
+Current implemented modules:
+
+- `packages/board-core`: state machine, compatibility, events, and role permissions.
+- `packages/principal-sdk`: deterministic Principal task scoring and task payload builder.
+- `adapters/codex-local`: local Codex Principal task JSON generator.
+- `adapters/filesystem`: no-Lark durable board state adapter.
+
 ## Public Repository Rules
 
 Do not commit real chat IDs, API keys, tokens, NAS paths, or user-specific config. Use `.example.json` or `.example.yaml` files for samples.
-

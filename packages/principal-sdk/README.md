@@ -1,6 +1,6 @@
 # Principal SDK
 
-Placeholder package for Principal identity helpers:
+Principal identity helpers:
 
 - build task specifications
 - score delegation quality
@@ -11,3 +11,11 @@ Placeholder package for Principal identity helpers:
 
 Core protocol logic must remain in `packages/board-core`.
 
+The current package implements deterministic local helpers for task creation:
+
+- `score_delegation`
+- `choose_acceptance_level`
+- `build_task_spec`
+
+Low-score tasks cannot be published without explicit acceptance tests. This
+keeps underspecified delegation from becoming silent contractor guesswork.
