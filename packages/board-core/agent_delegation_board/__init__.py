@@ -1,5 +1,6 @@
 from .compatibility import CompatibilityError, check_component_compatibility
 from .events import EVENT_TYPES, is_known_event_type
+from .lifecycle import BoardLifecycleError
 from .permissions import (
     PermissionError,
     assert_identity_owns_task,
@@ -17,6 +18,7 @@ from .validation import (
 __all__ = [
     "CompatibilityError",
     "EVENT_TYPES",
+    "BoardLifecycleError",
     "PermissionError",
     "ProtocolValidationError",
     "StateTransitionError",

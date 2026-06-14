@@ -33,4 +33,6 @@ PYTHONPATH="packages/board-core;adapters/filesystem" python -m unittest discover
 - `reject_task`
 - `close_task`
 
-这些动作会写任务快照和 `{task_id}.jsonl` 事件日志。Lark adapter 后续应对齐同一组状态和事件，而不是另起一套流程。
+这些动作会写任务快照和 `{task_id}.jsonl` 事件日志。生命周期规则来自 `packages/board-core/agent_delegation_board/lifecycle.py`，filesystem adapter 只负责文件读写和事件落盘。
+
+Lark、AgentOps、数据库或其他存储适配器后续应复用同一个 lifecycle API，而不是另起一套流程。

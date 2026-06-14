@@ -4,17 +4,24 @@ import json
 from pathlib import Path
 
 from agent_delegation_board import (
+    BoardLifecycleError,
     PermissionError,
     ProtocolValidationError,
-    StateTransitionError,
-    assert_identity_owns_task,
-    check_identity_capability,
-    check_role_capability,
     is_known_event_type,
-    transition,
     validate_event,
     validate_identity,
     validate_task,
+)
+from agent_delegation_board.lifecycle import (
+    approve_task as lifecycle_approve_task,
+    claim_task as lifecycle_claim_task,
+    close_task as lifecycle_close_task,
+    publish_task as lifecycle_publish_task,
+    reject_task as lifecycle_reject_task,
+    request_review as lifecycle_request_review,
+    start_execution as lifecycle_start_execution,
+    submit_result as lifecycle_submit_result,
+    transition_task as lifecycle_transition_task,
 )
 
 
@@ -33,6 +40,113 @@ RUNTIME_DIRS = [
 ]
 
 
+class FilesystemBoardStore:
+    def __init__(self, root):
+        self.root = init_board(root)
+
+    def register_agent(self, agent):
+        agent_id = agent.get("agent_id")
+        if not agent_id:
+            raise FilesystemBoardError("agent_id is required")
+        registry_path = self.root / "registry" / "agents.json"
+        registry = _read_json(registry_path)
+        registry[agent_id] = agent
+        _write_json(registry_path, registry)
+        return agent
+
+    def register_identity(self, identity):
+        validate_identity(identity)
+        registry_path = self.root / "registry" / "identities.json"
+        registry = _read_json(registry_path)
+        registry[identity["identity_id"]] = identity
+        _write_json(registry_path, registry)
+        return identity
+
+    def get_identity(self, identity_id):
+        registry = _read_json(self.root / "registry" / "identities.json")
+        identity = registry.get(identity_id)
+        if not identity:
+            raise FilesystemBoardError(f"identity not registered: {identity_id}")
+        if identity.get("status") != "active":
+            raise PermissionError(f"identity is not active: {identity_id}")
+        return identity
+
+    def create_active_task(self, task):
+        validate_task(task)
+        task_id = _require_task_id(task)
+        active_path = self._active_task_path(task_id)
+        closed_path = self._closed_task_path(task_id)
+        if active_path.exists() or closed_path.exists():
+            raise FilesystemBoardError(f"task already exists: {task_id}")
+        _write_json(active_path, task)
+        return active_path
+
+    def load_task(self, task_id):
+        active_path = self._active_task_path(task_id)
+        closed_path = self._closed_task_path(task_id)
+        if active_path.exists():
+            return _read_json(active_path)
+        if closed_path.exists():
+            return _read_json(closed_path)
+        raise FilesystemBoardError(f"task not found: {task_id}")
+
+    def load_active_task(self, task_id):
+        active_path = self._active_task_path(task_id)
+        if not active_path.exists():
+            raise FilesystemBoardError(f"active task not found: {task_id}")
+        return _read_json(active_path)
+
+    def save_active_task(self, task):
+        validate_task(task)
+        task["updated_at"] = _now()
+        _write_json(self._active_task_path(task["task_id"]), task)
+        return task
+
+    def close_active_task(self, task):
+        task["updated_at"] = _now()
+        closed_path = self._closed_task_path(task["task_id"])
+        _write_json(closed_path, task)
+        active_path = self._active_task_path(task["task_id"])
+        if active_path.exists():
+            active_path.unlink()
+        return closed_path
+
+    def append_event(self, task_id, event_type, actor_identity_id, payload=None):
+        if not is_known_event_type(event_type):
+            raise ProtocolValidationError(f"unknown event type: {event_type}")
+        timestamp = _now()
+        event = {
+            "event_id": _event_id(
+                task_id,
+                event_type,
+                actor_identity_id,
+                payload or {},
+                timestamp,
+            ),
+            "task_id": task_id,
+            "type": event_type,
+            "actor_identity_id": actor_identity_id,
+            "timestamp": timestamp,
+            "payload": payload or {},
+        }
+        validate_event(event)
+        with self._event_path(task_id).open("a", encoding="utf-8") as handle:
+            handle.write(json.dumps(event, ensure_ascii=False, sort_keys=True) + "\n")
+        return event
+
+    def task_ref(self, task_id):
+        return str(self._active_task_path(task_id).as_posix())
+
+    def _active_task_path(self, task_id):
+        return self.root / "tasks" / "active" / f"{task_id}.json"
+
+    def _closed_task_path(self, task_id):
+        return self.root / "tasks" / "closed" / f"{task_id}.json"
+
+    def _event_path(self, task_id):
+        return self.root / "events" / f"{task_id}.jsonl"
+
+
 def init_board(root):
     root_path = Path(root)
     for relative in RUNTIME_DIRS:
@@ -43,270 +157,109 @@ def init_board(root):
 
 
 def register_agent(root, agent):
-    root_path = init_board(root)
-    agent_id = agent.get("agent_id")
-    if not agent_id:
-        raise FilesystemBoardError("agent_id is required")
-    registry_path = root_path / "registry" / "agents.json"
-    registry = _read_json(registry_path)
-    registry[agent_id] = agent
-    _write_json(registry_path, registry)
-    return agent
+    return FilesystemBoardStore(root).register_agent(agent)
 
 
 def register_identity(root, identity):
-    validate_identity(identity)
-    root_path = init_board(root)
-    registry_path = root_path / "registry" / "identities.json"
-    registry = _read_json(registry_path)
-    registry[identity["identity_id"]] = identity
-    _write_json(registry_path, registry)
-    return identity
+    return FilesystemBoardStore(root).register_identity(identity)
 
 
 def get_identity(root, identity_id):
-    registry = _read_json(init_board(root) / "registry" / "identities.json")
-    identity = registry.get(identity_id)
-    if not identity:
-        raise FilesystemBoardError(f"identity not registered: {identity_id}")
-    if identity.get("status") != "active":
-        raise PermissionError(f"identity is not active: {identity_id}")
-    return identity
+    return FilesystemBoardStore(root).get_identity(identity_id)
 
 
 def publish_task(root, task, actor_identity_id):
-    validate_task(task)
-    actor = get_identity(root, actor_identity_id)
-    check_identity_capability(actor, "publish_task")
-    assert_identity_owns_task(actor_identity_id, task, "principal_identity_id")
-    _assert_task_identity(root, task["contractor_identity_id"], "contractor")
-    if task.get("board_identity_id"):
-        _assert_task_identity(root, task["board_identity_id"], "board")
-
-    root_path = init_board(root)
-    task_id = _require_task_id(task)
-    active_path = root_path / "tasks" / "active" / f"{task_id}.json"
-    closed_path = root_path / "tasks" / "closed" / f"{task_id}.json"
-
-    if active_path.exists() or closed_path.exists():
-        raise FilesystemBoardError(f"task already exists: {task_id}")
-    if task.get("status") != "published":
-        raise FilesystemBoardError("published task snapshot must have status=published")
-
-    _write_json(active_path, task)
-    append_event(
-        root_path,
-        task_id,
-        "task_published",
+    return lifecycle_publish_task(
+        FilesystemBoardStore(root),
+        task,
         actor_identity_id,
-        {"task_path": str(active_path.as_posix())},
     )
-    return active_path
 
 
 def claim_task(root, task_id, contractor_identity_id):
-    task = load_task(root, task_id)
-    actor = get_identity(root, contractor_identity_id)
-    check_identity_capability(actor, "claim_task")
-    assert_identity_owns_task(contractor_identity_id, task, "contractor_identity_id")
-    return transition_task(
-        root,
+    return lifecycle_claim_task(
+        FilesystemBoardStore(root),
         task_id,
-        "accepted_by_contractor",
         contractor_identity_id,
-        {"event": "task_claimed"},
     )
 
 
 def start_execution(root, task_id, contractor_identity_id):
-    task = load_task(root, task_id)
-    actor = get_identity(root, contractor_identity_id)
-    check_identity_capability(actor, "start_execution")
-    assert_identity_owns_task(contractor_identity_id, task, "contractor_identity_id")
-    return transition_task(
-        root,
+    return lifecycle_start_execution(
+        FilesystemBoardStore(root),
         task_id,
-        "running",
         contractor_identity_id,
-        {"event": "execution_started"},
     )
 
 
 def submit_result(root, task_id, contractor_identity_id, result_file, artifacts=None):
-    task = load_task(root, task_id)
-    actor = get_identity(root, contractor_identity_id)
-    check_identity_capability(actor, "submit_result")
-    assert_identity_owns_task(contractor_identity_id, task, "contractor_identity_id")
-    task["result_file"] = result_file
-    task["artifacts"] = artifacts or task.get("artifacts", {})
-    _save_active_task(root, task)
-    append_event(
-        root,
+    return lifecycle_submit_result(
+        FilesystemBoardStore(root),
         task_id,
-        "result_submitted",
         contractor_identity_id,
-        {"result_file": result_file, "artifacts": artifacts or {}},
+        result_file,
+        artifacts,
     )
-    return transition_task(root, task_id, "submitted", contractor_identity_id)
 
 
 def request_review(root, task_id, board_identity_id):
-    task = load_task(root, task_id)
-    actor = get_identity(root, board_identity_id)
-    check_identity_capability(actor, "request_review")
-    if task.get("board_identity_id") and task["board_identity_id"] != board_identity_id:
-        raise PermissionError("board identity does not match task board_identity_id")
-    append_event(root, task_id, "review_requested", board_identity_id, {})
-    return transition_task(root, task_id, "reviewing", board_identity_id)
+    return lifecycle_request_review(
+        FilesystemBoardStore(root),
+        task_id,
+        board_identity_id,
+    )
 
 
 def approve_task(root, task_id, principal_identity_id, review_file=None):
-    task = load_task(root, task_id)
-    actor = get_identity(root, principal_identity_id)
-    check_identity_capability(actor, "approve_task")
-    assert_identity_owns_task(principal_identity_id, task, "principal_identity_id")
-    task["review_verdict"] = "approved"
-    if review_file:
-        task["review_file"] = review_file
-    _save_active_task(root, task)
-    append_event(
-        root,
+    return lifecycle_approve_task(
+        FilesystemBoardStore(root),
         task_id,
-        "review_approved",
         principal_identity_id,
-        {"review_file": review_file} if review_file else {},
+        review_file,
     )
-    return transition_task(root, task_id, "approved", principal_identity_id)
 
 
 def reject_task(root, task_id, principal_identity_id, review_file, revision_request):
-    if not revision_request:
-        raise FilesystemBoardError("revision_request is required when rejecting")
-    task = load_task(root, task_id)
-    actor = get_identity(root, principal_identity_id)
-    check_identity_capability(actor, "reject_task")
-    assert_identity_owns_task(principal_identity_id, task, "principal_identity_id")
-    task["review_verdict"] = "rejected"
-    task["review_file"] = review_file
-    task["revision_request"] = revision_request
-    _save_active_task(root, task)
-    append_event(
-        root,
-        task_id,
-        "review_rejected",
-        principal_identity_id,
-        {"review_file": review_file, "revision_request": revision_request},
-    )
-    transition_task(root, task_id, "rejected", principal_identity_id)
-    return transition_task(root, task_id, "revision_requested", principal_identity_id)
+    try:
+        return lifecycle_reject_task(
+            FilesystemBoardStore(root),
+            task_id,
+            principal_identity_id,
+            review_file,
+            revision_request,
+        )
+    except BoardLifecycleError as exc:
+        raise FilesystemBoardError(str(exc)) from exc
 
 
 def load_task(root, task_id):
-    root_path = Path(root)
-    active_path = root_path / "tasks" / "active" / f"{task_id}.json"
-    closed_path = root_path / "tasks" / "closed" / f"{task_id}.json"
-    if active_path.exists():
-        return _read_json(active_path)
-    if closed_path.exists():
-        return _read_json(closed_path)
-    raise FilesystemBoardError(f"task not found: {task_id}")
+    return FilesystemBoardStore(root).load_task(task_id)
 
 
 def transition_task(root, task_id, target_status, actor_identity_id, payload=None):
-    root_path = init_board(root)
-    active_path = root_path / "tasks" / "active" / f"{task_id}.json"
-    if not active_path.exists():
-        raise FilesystemBoardError(f"active task not found: {task_id}")
-
-    task = _read_json(active_path)
-    try:
-        task["status"] = transition(task["status"], target_status)
-    except StateTransitionError as exc:
-        append_event(
-            root_path,
-            task_id,
-            "incident_created",
-            actor_identity_id,
-            {"error": str(exc), "target_status": target_status},
-        )
-        raise
-
-    task["updated_at"] = _now()
-    _write_json(active_path, task)
-    append_event(
-        root_path,
+    return lifecycle_transition_task(
+        FilesystemBoardStore(root),
         task_id,
-        "status_changed",
+        target_status,
         actor_identity_id,
-        {"status": target_status, **(payload or {})},
+        payload,
     )
-    return task
 
 
 def close_task(root, task_id, actor_identity_id):
-    root_path = init_board(root)
-    active_path = root_path / "tasks" / "active" / f"{task_id}.json"
-    closed_path = root_path / "tasks" / "closed" / f"{task_id}.json"
-    if not active_path.exists():
-        raise FilesystemBoardError(f"active task not found: {task_id}")
-
-    actor = get_identity(root_path, actor_identity_id)
-    check_identity_capability(actor, "close_task")
-    task = _read_json(active_path)
-    if task.get("board_identity_id") and task["board_identity_id"] != actor_identity_id:
-        raise PermissionError("board identity does not match task board_identity_id")
-    if task.get("status") != "approved":
-        raise FilesystemBoardError("only approved tasks can be closed")
-
-    task["status"] = transition("approved", "closed")
-    task["updated_at"] = _now()
-    _write_json(closed_path, task)
-    active_path.unlink()
-    append_event(root_path, task_id, "task_closed", actor_identity_id, {})
-    return closed_path
+    try:
+        lifecycle_close_task(FilesystemBoardStore(root), task_id, actor_identity_id)
+    except BoardLifecycleError as exc:
+        raise FilesystemBoardError(str(exc)) from exc
+    return FilesystemBoardStore(root)._closed_task_path(task_id)
 
 
 def append_event(root, task_id, event_type, actor_identity_id, payload=None):
-    if not is_known_event_type(event_type):
-        raise ProtocolValidationError(f"unknown event type: {event_type}")
-    root_path = init_board(root)
-    timestamp = _now()
-    event = {
-        "event_id": _event_id(
-            task_id,
-            event_type,
-            actor_identity_id,
-            payload or {},
-            timestamp,
-        ),
-        "task_id": task_id,
-        "type": event_type,
-        "actor_identity_id": actor_identity_id,
-        "timestamp": timestamp,
-        "payload": payload or {},
-    }
-    validate_event(event)
-    event_path = root_path / "events" / f"{task_id}.jsonl"
-    with event_path.open("a", encoding="utf-8") as handle:
-        handle.write(json.dumps(event, ensure_ascii=False, sort_keys=True) + "\n")
-    return event
-
-
-def _assert_task_identity(root, identity_id, expected_role):
-    identity = get_identity(root, identity_id)
-    if identity["role_type"] != expected_role:
-        raise PermissionError(
-            f"identity {identity_id} must be role {expected_role}, got {identity['role_type']}"
-        )
-    return identity
-
-
-def _save_active_task(root, task):
-    validate_task(task)
-    task["updated_at"] = _now()
-    _write_json(
-        init_board(root) / "tasks" / "active" / f"{task['task_id']}.json",
-        task,
+    return FilesystemBoardStore(root).append_event(
+        task_id,
+        event_type,
+        actor_identity_id,
+        payload,
     )
 
 

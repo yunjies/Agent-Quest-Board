@@ -50,6 +50,7 @@ sh scripts/run-tests.sh
 当前已实现模块：
 
 - `packages/board-core`：状态机、兼容性、事件类型、角色权限。
+- `packages/board-core/agent_delegation_board/lifecycle.py`：平台无关的公告板生命周期规则。
 - `packages/principal-sdk`：甲方任务评分与任务 payload 构建。
 - `adapters/codex-local`：Codex 本地甲方开单 JSON 生成器。
 - `adapters/filesystem`：无飞书模式下的公告板落盘适配器。
