@@ -1,0 +1,15 @@
+{
+  "identity_id": "principal-example",
+  "agent_id": "agent-example-principal",
+  "role_type": "principal",
+  "permissions": [
+    "publish_task",
+    "review_task",
+    "approve_task",
+    "reject_task",
+    "score_contractor"
+  ],
+  "board_protocol_version": "1.0",
+  "implementation_version": "0.1.0",
+  "status": "active"
+}

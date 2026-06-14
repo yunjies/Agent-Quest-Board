@@ -1,0 +1,14 @@
+{
+  "task_id": "task-codex-example-001",
+  "title": "Codex example task",
+  "description": "Generate a task from Codex principal adapter and publish it to a filesystem board root.",
+  "principal_identity_id": "principal-codex-pc",
+  "contractor_identity_id": "contractor-duoduo",
+  "board_identity_id": "board-duoduo",
+  "status": "published",
+  "board_protocol_version": "1.0",
+  "delegation_score": 8,
+  "acceptance_level": "smoke_required",
+  "acceptance_tests": ["task snapshot exists", "event log exists"],
+  "artifacts": {}
+}

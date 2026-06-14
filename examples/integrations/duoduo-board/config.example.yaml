@@ -1,0 +1,12 @@
+component_id: board-duoduo-example
+board_identity_id: board-duoduo
+board_protocol_version: "1.0"
+storage:
+  board_root: .local/board
+frontends:
+  lark:
+    enabled: false
+    topic_group_id: example-topic-group-id
+observer:
+  enabled: true
+  export_dir: .local/observer

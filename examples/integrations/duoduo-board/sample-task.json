@@ -1,0 +1,10 @@
+{
+  "task_id": "task-duoduo-board-example-001",
+  "title": "Duoduo board example task",
+  "principal_identity_id": "principal-codex-pc",
+  "contractor_identity_id": "contractor-duoduo",
+  "board_identity_id": "board-duoduo",
+  "status": "published",
+  "board_protocol_version": "1.0",
+  "artifacts": {}
+}

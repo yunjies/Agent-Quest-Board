@@ -1,0 +1,2 @@
+{"event_id":"event-lark-topic-example-001","task_id":"task-lark-topic-example-001","type":"task_published","actor_identity_id":"principal-codex-pc","timestamp":"2026-01-01T00:00:00+00:00","payload":{"frontend":"lark","topic_ref":"example-topic-ref"}}
+{"event_id":"event-lark-topic-example-002","task_id":"task-lark-topic-example-001","type":"incident_created","actor_identity_id":"board-duoduo","timestamp":"2026-01-01T00:01:00+00:00","payload":{"reason":"frontend sync failed","frontend":"lark"}}

@@ -1,0 +1,2 @@
+{"event_id":"event-duoduo-board-example-001","task_id":"task-duoduo-board-example-001","type":"task_published","actor_identity_id":"principal-codex-pc","timestamp":"2026-01-01T00:00:00+00:00","payload":{}}
+{"event_id":"event-duoduo-board-example-002","task_id":"task-duoduo-board-example-001","type":"review_requested","actor_identity_id":"board-duoduo","timestamp":"2026-01-01T00:02:00+00:00","payload":{}}

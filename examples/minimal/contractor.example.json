@@ -1,0 +1,16 @@
+{
+  "identity_id": "contractor-example",
+  "agent_id": "agent-example-contractor",
+  "role_type": "contractor",
+  "permissions": [
+    "claim_task",
+    "start_execution",
+    "submit_result",
+    "request_clarification",
+    "mark_blocked",
+    "resubmit_result"
+  ],
+  "board_protocol_version": "1.0",
+  "implementation_version": "0.1.0",
+  "status": "active"
+}

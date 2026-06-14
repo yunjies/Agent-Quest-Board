@@ -1,0 +1,5 @@
+{"event_id":"event-example-001","task_id":"task-example-001","type":"task_published","actor_identity_id":"principal-example","timestamp":"2026-01-01T00:00:00+00:00","payload":{"task_path":"board/tasks/active/task-example-001.json"}}
+{"event_id":"event-example-002","task_id":"task-example-001","type":"task_claimed","actor_identity_id":"contractor-example","timestamp":"2026-01-01T00:01:00+00:00","payload":{}}
+{"event_id":"event-example-003","task_id":"task-example-001","type":"result_submitted","actor_identity_id":"contractor-example","timestamp":"2026-01-01T00:02:00+00:00","payload":{"result_file":"results/task-example-001.md"}}
+{"event_id":"event-example-004","task_id":"task-example-001","type":"review_approved","actor_identity_id":"principal-example","timestamp":"2026-01-01T00:03:00+00:00","payload":{"review_file":"reviews/task-example-001.md"}}
+{"event_id":"event-example-005","task_id":"task-example-001","type":"task_closed","actor_identity_id":"board-example","timestamp":"2026-01-01T00:04:00+00:00","payload":{}}

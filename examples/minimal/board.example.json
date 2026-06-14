@@ -1,0 +1,17 @@
+{
+  "identity_id": "board-example",
+  "agent_id": "agent-example-board",
+  "role_type": "board",
+  "permissions": [
+    "append_event",
+    "transition_status",
+    "route_notification",
+    "request_review",
+    "close_task",
+    "create_incident",
+    "export_observer_data"
+  ],
+  "board_protocol_version": "1.0",
+  "implementation_version": "0.1.0",
+  "status": "active"
+}

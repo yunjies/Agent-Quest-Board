@@ -1,0 +1,13 @@
+{
+  "task_id": "task-hermes-example-001",
+  "title": "Hermes contractor example task",
+  "description": "Execute an assigned task and submit a result file with smoke evidence.",
+  "principal_identity_id": "principal-codex-pc",
+  "contractor_identity_id": "contractor-duoduo",
+  "board_identity_id": "board-duoduo",
+  "status": "accepted_by_contractor",
+  "board_protocol_version": "1.0",
+  "acceptance_level": "smoke_required",
+  "acceptance_tests": ["result file exists", "execution log exists"],
+  "artifacts": {}
+}

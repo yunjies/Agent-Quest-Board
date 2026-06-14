@@ -1,0 +1,2 @@
+{"event_id":"event-hermes-example-001","task_id":"task-hermes-example-001","type":"task_claimed","actor_identity_id":"contractor-duoduo","timestamp":"2026-01-01T00:01:00+00:00","payload":{}}
+{"event_id":"event-hermes-example-002","task_id":"task-hermes-example-001","type":"result_submitted","actor_identity_id":"contractor-duoduo","timestamp":"2026-01-01T00:02:00+00:00","payload":{"result_file":"results/task-hermes-example-001.md"}}

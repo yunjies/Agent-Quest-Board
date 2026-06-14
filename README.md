@@ -65,6 +65,13 @@ examples/             示例组件声明
 tests/                协议、兼容性、集成测试
 ```
 
+`examples/` 分为：
+
+```text
+examples/minimal/        平台无关最小协议样例
+examples/integrations/   Codex、Hermes、多多、Lark 接入案例
+```
+
 ## Public 仓库安全规则
 
 不要提交真实 chat_id、API key、token、NAS 路径或用户本地配置。所有示例都使用 `.example.json` 或 `.example.yaml`。

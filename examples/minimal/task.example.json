@@ -1,0 +1,23 @@
+{
+  "task_id": "task-example-001",
+  "title": "Example no-frontend task",
+  "description": "Demonstrate a platform-neutral task lifecycle.",
+  "principal_identity_id": "principal-example",
+  "contractor_identity_id": "contractor-example",
+  "board_identity_id": "board-example",
+  "status": "published",
+  "board_protocol_version": "1.0",
+  "delegation_score": 8,
+  "score_breakdown": {
+    "description_detail": 3,
+    "context": 2,
+    "acceptance_tests": 2,
+    "constraints": 1
+  },
+  "acceptance_level": "smoke_required",
+  "acceptance_tests": [
+    "result_file exists",
+    "event log contains result_submitted"
+  ],
+  "artifacts": {}
+}

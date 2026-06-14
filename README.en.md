@@ -25,6 +25,13 @@ examples/             Example component manifests
 tests/                Protocol, compatibility, and integration tests
 ```
 
+`examples/` is split into:
+
+```text
+examples/minimal/        Platform-neutral protocol examples
+examples/integrations/   Codex, Hermes, Duoduo, and Lark integration examples
+```
+
 ## Development Ownership
 
 Current v1 development is split by role:

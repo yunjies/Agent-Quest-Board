@@ -1,0 +1,15 @@
+{
+  "task_id": "task-lark-topic-example-001",
+  "title": "Lark topic frontend example",
+  "principal_identity_id": "principal-codex-pc",
+  "contractor_identity_id": "contractor-duoduo",
+  "board_identity_id": "board-duoduo",
+  "status": "published",
+  "board_protocol_version": "1.0",
+  "frontends": {
+    "lark": {
+      "topic_ref": "example-topic-ref"
+    }
+  },
+  "artifacts": {}
+}

@@ -1,0 +1,8 @@
+component_id: principal-codex-example
+principal_identity_id: principal-codex-pc
+default_board_identity_id: board-duoduo
+default_contractor_identity_id: contractor-duoduo
+board_protocol_version: "1.0"
+local:
+  board_root: .local/board
+  output_dir: .local/out
