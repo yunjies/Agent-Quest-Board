@@ -1,44 +1,149 @@
+import json
 import tempfile
 import unittest
 from pathlib import Path
 
 from agent_delegation_filesystem import (
+    approve_task,
+    claim_task,
     close_task,
     init_board,
     load_task,
     publish_task,
-    transition_task,
+    register_identity,
+    request_review,
+    start_execution,
+    submit_result,
 )
 
 
 class FilesystemAdapterTest(unittest.TestCase):
-    def test_publish_transition_and_close_without_lark(self):
+    def test_publish_submit_review_and_close_without_lark(self):
         with tempfile.TemporaryDirectory() as tmp:
             root = Path(tmp)
             init_board(root)
-            task = {
-                "task_id": "task-no-lark-001",
-                "title": "No Lark task",
-                "principal_identity_id": "principal-codex-pc",
-                "contractor_identity_id": "contractor-duoduo",
-                "board_identity_id": "board-duoduo",
-                "status": "published",
-                "board_protocol_version": "1.0",
-            }
+            _register_default_identities(root)
+            task = _task()
 
             publish_task(root, task, "principal-codex-pc")
             self.assertEqual(load_task(root, "task-no-lark-001")["status"], "published")
 
-            transition_task(root, "task-no-lark-001", "accepted_by_contractor", "board-duoduo")
-            transition_task(root, "task-no-lark-001", "running", "contractor-duoduo")
-            transition_task(root, "task-no-lark-001", "submitted", "contractor-duoduo")
-            transition_task(root, "task-no-lark-001", "reviewing", "principal-codex-pc")
-            transition_task(root, "task-no-lark-001", "approved", "principal-codex-pc")
+            claim_task(root, "task-no-lark-001", "contractor-duoduo")
+            start_execution(root, "task-no-lark-001", "contractor-duoduo")
+            submit_result(
+                root,
+                "task-no-lark-001",
+                "contractor-duoduo",
+                "results/task-no-lark-001.md",
+                {"smoke": "passed"},
+            )
+            request_review(root, "task-no-lark-001", "board-duoduo")
+            approve_task(
+                root,
+                "task-no-lark-001",
+                "principal-codex-pc",
+                "reviews/task-no-lark-001.md",
+            )
             close_task(root, "task-no-lark-001", "board-duoduo")
 
+            closed = load_task(root, "task-no-lark-001")
+            self.assertEqual(closed["status"], "closed")
             self.assertFalse((root / "tasks" / "active" / "task-no-lark-001.json").exists())
             self.assertTrue((root / "tasks" / "closed" / "task-no-lark-001.json").exists())
-            self.assertTrue((root / "events" / "task-no-lark-001.jsonl").exists())
+
+            events = _read_events(root / "events" / "task-no-lark-001.jsonl")
+            self.assertEqual(events[0]["type"], "task_published")
+            self.assertIn("result_submitted", [event["type"] for event in events])
+            self.assertEqual(events[-1]["type"], "task_closed")
+
+    def test_contractor_cannot_submit_unassigned_task(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            init_board(root)
+            _register_default_identities(root)
+            register_identity(
+                root,
+                {
+                    "identity_id": "contractor-other",
+                    "agent_id": "agent-other",
+                    "role_type": "contractor",
+                    "permissions": ["claim_task", "submit_result"],
+                    "board_protocol_version": "1.0",
+                    "status": "active",
+                },
+            )
+            publish_task(root, _task(), "principal-codex-pc")
+
+            with self.assertRaises(Exception):
+                submit_result(
+                    root,
+                    "task-no-lark-001",
+                    "contractor-other",
+                    "results/wrong.md",
+                )
+
+
+def _register_default_identities(root):
+    register_identity(
+        root,
+        {
+            "identity_id": "principal-codex-pc",
+                    "agent_id": "agent-codex",
+                    "role_type": "principal",
+                    "permissions": [
+                        "publish_task",
+                        "review_task",
+                        "approve_task",
+                        "reject_task",
+                    ],
+            "board_protocol_version": "1.0",
+            "status": "active",
+        },
+    )
+    register_identity(
+        root,
+        {
+            "identity_id": "contractor-duoduo",
+                    "agent_id": "agent-duoduo",
+                    "role_type": "contractor",
+                    "permissions": ["claim_task", "start_execution", "submit_result"],
+            "board_protocol_version": "1.0",
+            "status": "active",
+        },
+    )
+    register_identity(
+        root,
+        {
+            "identity_id": "board-duoduo",
+                    "agent_id": "agent-duoduo",
+                    "role_type": "board",
+                    "permissions": [
+                        "append_event",
+                        "transition_status",
+                        "route_notification",
+                        "request_review",
+                        "close_task",
+                    ],
+            "board_protocol_version": "1.0",
+            "status": "active",
+        },
+    )
+
+
+def _task():
+    return {
+        "task_id": "task-no-lark-001",
+        "title": "No Lark task",
+        "principal_identity_id": "principal-codex-pc",
+        "contractor_identity_id": "contractor-duoduo",
+        "board_identity_id": "board-duoduo",
+        "status": "published",
+        "board_protocol_version": "1.0",
+    }
+
+
+def _read_events(path):
+    return [json.loads(line) for line in path.read_text(encoding="utf-8").splitlines()]
 
 
 if __name__ == "__main__":

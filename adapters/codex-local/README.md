@@ -20,6 +20,23 @@ python adapters/codex-local/codex_principal.py \
 
 生成的 JSON 可以交给实现了 `publish_task` 的公告板适配器。
 
+也可以直接发布到 filesystem board root：
+
+```bash
+python adapters/codex-local/codex_principal.py \
+  --title "Local smoke" \
+  --description-file task.md \
+  --principal-id principal-codex-pc \
+  --contractor-id contractor-duoduo \
+  --board-id board-duoduo \
+  --acceptance-test "Task snapshot exists" \
+  --output out/task.json \
+  --board-root .local/board \
+  --register-example-identities
+```
+
+`--register-example-identities` 只用于本地 smoke。真实部署应由公告板注册实际 identity。
+
 ## 边界
 
 - 不要求仓库配置 API key。

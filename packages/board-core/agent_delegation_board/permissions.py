@@ -49,6 +49,15 @@ def check_role_capability(role, capability):
     return True
 
 
+def check_identity_capability(identity, capability):
+    check_role_capability(identity["role_type"], capability)
+    if capability not in identity.get("permissions", []):
+        raise PermissionError(
+            f"identity {identity['identity_id']} lacks permission: {capability}"
+        )
+    return True
+
+
 def assert_identity_owns_task(identity_id, task, identity_field):
     expected = task.get(identity_field)
     if expected != identity_id:

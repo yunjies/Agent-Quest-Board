@@ -3,6 +3,7 @@ import unittest
 from agent_delegation_board import (
     PermissionError,
     assert_identity_owns_task,
+    check_identity_capability,
     check_role_capability,
 )
 
@@ -33,6 +34,16 @@ class PermissionTest(unittest.TestCase):
                 task,
                 "principal_identity_id",
             )
+
+    def test_identity_permission_must_include_capability(self):
+        identity = {
+            "identity_id": "principal-codex-pc",
+            "role_type": "principal",
+            "permissions": ["publish_task"],
+        }
+        self.assertTrue(check_identity_capability(identity, "publish_task"))
+        with self.assertRaises(PermissionError):
+            check_identity_capability(identity, "approve_task")
 
 
 if __name__ == "__main__":
