@@ -2,7 +2,7 @@
 
 Agent委托公告板是一个协议优先的 Agent 委托协作框架。它把“谁发任务、谁执行任务、谁验收任务、任务在哪里展示、状态如何流转”从具体 Agent 和具体平台中解耦出来。
 
-English README: [README.md](README.md)
+English README: [README.en.md](README.en.md)
 
 ## 三方角色
 
