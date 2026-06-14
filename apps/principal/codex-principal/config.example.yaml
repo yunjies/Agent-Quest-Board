@@ -1,0 +1,11 @@
+app_id: codex-principal
+principal_identity_id: principal-codex-pc
+board_protocol_version: "1.0"
+default_board_identity_id: board-duoduo
+default_contractor_identity_id: contractor-duoduo
+adapters:
+  principal: codex-local
+  board_storage: filesystem
+local:
+  board_root: .local/board
+  output_dir: .local/out

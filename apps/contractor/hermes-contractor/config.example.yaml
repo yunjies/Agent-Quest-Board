@@ -1,0 +1,12 @@
+app_id: hermes-contractor
+contractor_identity_id: contractor-duoduo
+board_protocol_version: "1.0"
+adapters:
+  contractor_runtime: hermes
+  board_storage: filesystem
+runtime:
+  inbox_dir: .local/hermes/inbox
+  results_dir: .local/hermes/results
+  logs_dir: .local/hermes/logs
+polling:
+  fallback_interval_seconds: 30
