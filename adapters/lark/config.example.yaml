@@ -1,0 +1,7 @@
+app_id: lark-topic-board
+board_identity_id: board-duoduo
+lark_notifier:
+  topic_group_id: oc_example_group_chat
+  incident_chat_id: oc_example_incident_chat
+  dry_run: true
+  lark_cli_bin: lark-cli
