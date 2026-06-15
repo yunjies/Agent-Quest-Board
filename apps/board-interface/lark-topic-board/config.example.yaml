@@ -1,15 +1,11 @@
-app_id: lark-topic-board
-board_identity_id: board-duoduo
+frontend_id: lark-topic-board-example
 board_protocol_version: "1.0"
-adapters:
-  frontend: lark
-  board_storage: filesystem
 lark:
   app_id: example-app-id
   topic_group_id: example-topic-group-id
   credential_source: environment
-storage:
-  task_topic_map: .local/frontends/lark-topic-map.json
+mapping:
+  task_to_topic_store: .local/frontends/lark-topic-map.json
 notifications:
   route_all_task_events_to_topic: true
   incident_channel: example-incident-channel
