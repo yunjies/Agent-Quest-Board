@@ -1,0 +1,29 @@
+{
+  "framework_release": "0.2.0-formal-adapters",
+  "board_protocol_version": "1.0",
+  "status": "planned",
+  "target": "Formal Hermes and Lark adapter integration without changing protocol 1.0.",
+  "required_component_versions": {
+    "principal-codex-pc": ">=0.1.0",
+    "contractor-duoduo": ">=0.2.0",
+    "board-duoduo": ">=0.2.0"
+  },
+  "required_capabilities": {
+    "principal": ["publish_task", "review_task", "approve_task", "reject_task"],
+    "contractor": ["claim_task", "start_execution", "submit_result", "mark_blocked"],
+    "board": ["append_event", "transition_status", "route_notification", "request_review", "close_task"]
+  },
+  "acceptance_gates": [
+    "Real Hermes ExecutionProvider can execute or fail observably.",
+    "Real Lark notifier can send or fail observably.",
+    "Frontend sync failure does not close or corrupt core tasks.",
+    "No credentials or local runtime config are committed.",
+    "Local e2e baseline remains green."
+  ],
+  "verification_commands": [
+    "powershell -NoProfile -ExecutionPolicy Bypass -File scripts\\run-tests.ps1",
+    "powershell -NoProfile -ExecutionPolicy Bypass -File scripts\\run-local-e2e.ps1",
+    "powershell -NoProfile -ExecutionPolicy Bypass -File apps\\contractor\\hermes-contractor\\run-smoke.ps1",
+    "powershell -NoProfile -ExecutionPolicy Bypass -File apps\\board-interface\\lark-topic-board\\run-smoke.ps1"
+  ]
+}

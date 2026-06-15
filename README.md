@@ -46,6 +46,24 @@ examples/                 接入样例：最小协议样例和真实集成样例
 
 详细分工见：[docs/development-ownership.md](docs/development-ownership.md)
 
+## 版本与正式接入
+
+版本分为三层：
+
+```text
+board_protocol_version   协议版本
+framework_release        框架发布版本
+implementation_version   组件实现版本
+```
+
+当前协议版本为 `1.0`。正式 Hermes/Lark 接入只升级 release 和实现版本，不改变协议版本。
+
+相关文档：
+
+- [版本管理](docs/release-management.md)
+- [正式接入计划](docs/formal-integration-plan.md)
+- [Release manifests](protocol/releases/README.md)
+
 ## 语言约定
 
 本仓库主要语言为中文。面向开发者和使用者的主文档默认使用中文；代码标识符、JSON 字段名、schema、CLI 参数和 capability 名称保留英文。

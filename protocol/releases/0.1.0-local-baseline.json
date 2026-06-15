@@ -1,0 +1,36 @@
+{
+  "framework_release": "0.1.0-local-baseline",
+  "board_protocol_version": "1.0",
+  "status": "verified",
+  "verified_at": "2026-06-15",
+  "compatible_component_versions": {
+    "principal-codex-pc": {
+      "implementation_version": "0.1.0",
+      "board_protocol_version": "1.0"
+    },
+    "contractor-duoduo": {
+      "implementation_version": "0.1.0",
+      "board_protocol_version": "1.0"
+    },
+    "board-duoduo": {
+      "implementation_version": "0.1.0",
+      "board_protocol_version": "1.0"
+    }
+  },
+  "required_capabilities": {
+    "principal": ["publish_task", "review_task", "approve_task", "reject_task"],
+    "contractor": ["claim_task", "start_execution", "submit_result"],
+    "board": ["append_event", "transition_status", "route_notification", "request_review", "close_task"]
+  },
+  "verification_commands": [
+    "powershell -NoProfile -ExecutionPolicy Bypass -File scripts\\run-tests.ps1",
+    "powershell -NoProfile -ExecutionPolicy Bypass -File apps\\contractor\\hermes-contractor\\run-smoke.ps1",
+    "powershell -NoProfile -ExecutionPolicy Bypass -File apps\\board-interface\\lark-topic-board\\run-smoke.ps1",
+    "powershell -NoProfile -ExecutionPolicy Bypass -File scripts\\run-local-e2e.ps1"
+  ],
+  "known_limits": [
+    "Hermes contractor uses a default placeholder ExecutionProvider.",
+    "Lark notifier is not wired to a real local lark-cli runtime.",
+    "Event-driven automatic claim/review/revision watchers are not productized."
+  ]
+}
