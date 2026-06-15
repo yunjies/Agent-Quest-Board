@@ -277,5 +277,152 @@ class HermesContractorTest(unittest.TestCase):
                 c.claim_task("other-task")
 
 
+class TestExecutionProvider(unittest.TestCase):
+    """Tests for ExecutionProvider pluggable interface."""
+
+    def test_default_executor_creates_result_files(self):
+        """DefaultExecutionProvider should create result and log files."""
+        import tempfile
+        from pathlib import Path
+        from agent_delegation_hermes_contractor import DefaultExecutionProvider
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            results_dir = root / "results"
+            logs_dir = root / "logs"
+            provider = DefaultExecutionProvider(
+                results_dir=results_dir,
+                logs_dir=logs_dir,
+            )
+            task = {"task_id": "test-001", "title": "Test"}
+            outcome = provider.execute(task)
+
+            self.assertTrue(Path(outcome["result_file"]).exists())
+            self.assertTrue(Path(outcome["execution_log"]).exists())
+            self.assertIn("test-001", outcome["result_file"])
+
+    def test_custom_executor_injected_into_contractor(self):
+        """HermesContractor should use a custom ExecutionProvider if provided."""
+        import tempfile
+        from pathlib import Path
+        from agent_delegation_hermes_contractor import ExecutionProvider, HermesContractor
+
+        # Define a custom executor
+        class MockExecutor(ExecutionProvider):
+            def __init__(self):
+                self.called_with = None
+
+            def execute(self, task):
+                self.called_with = task
+                return {
+                    "result_file": "/tmp/mock-result.json",
+                    "artifacts": {"mock": True},
+                    "execution_log": "/tmp/mock-exec.log",
+                }
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            from agent_delegation_filesystem import init_board, register_identity
+            init_board(root)
+            register_identity(root, {
+                "identity_id": "contractor-duoduo",
+                "agent_id": "agent-duoduo",
+                "role_type": "contractor",
+                "permissions": ["claim_task"],
+                "board_protocol_version": "1.0",
+                "status": "active",
+            })
+            register_identity(root, {
+                "identity_id": "principal-codex-pc",
+                "agent_id": "agent-codex",
+                "role_type": "principal",
+                "permissions": ["publish_task"],
+                "board_protocol_version": "1.0",
+                "status": "active",
+            })
+            register_identity(root, {
+                "identity_id": "board-duoduo",
+                "agent_id": "agent-duoduo",
+                "role_type": "board",
+                "permissions": [],
+                "board_protocol_version": "1.0",
+                "status": "active",
+            })
+
+            mock = MockExecutor()
+            c = HermesContractor(root, executor=mock)
+            c.ensure_registered()
+
+            # Verify execute_task uses the custom executor
+            # First we need a task in the board
+            from agent_delegation_filesystem import publish_task
+            publish_task(root, {
+                "task_id": "executor-test",
+                "title": "Executor test",
+                "principal_identity_id": "principal-codex-pc",
+                "contractor_identity_id": "contractor-duoduo",
+                "board_identity_id": "board-duoduo",
+                "status": "published",
+                "board_protocol_version": "1.0",
+            }, "principal-codex-pc")
+
+            outcome = c.execute_task("executor-test")
+            self.assertEqual(outcome["result_file"], "/tmp/mock-result.json")
+            self.assertTrue(outcome["artifacts"]["mock"])
+
+    def test_default_executor_used_when_none_provided(self):
+        """HermesContractor should use DefaultExecutionProvider when no executor given."""
+        import tempfile
+        from pathlib import Path
+        from agent_delegation_hermes_contractor import HermesContractor, DefaultExecutionProvider
+
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            from agent_delegation_filesystem import init_board, register_identity, publish_task
+            init_board(root)
+            register_identity(root, {
+                "identity_id": "contractor-duoduo",
+                "agent_id": "agent-duoduo",
+                "role_type": "contractor",
+                "permissions": ["claim_task"],
+                "board_protocol_version": "1.0",
+                "status": "active",
+            })
+            register_identity(root, {
+                "identity_id": "principal-codex-pc",
+                "agent_id": "agent-codex",
+                "role_type": "principal",
+                "permissions": ["publish_task"],
+                "board_protocol_version": "1.0",
+                "status": "active",
+            })
+            register_identity(root, {
+                "identity_id": "board-duoduo",
+                "agent_id": "agent-duoduo",
+                "role_type": "board",
+                "permissions": [],
+                "board_protocol_version": "1.0",
+                "status": "active",
+            })
+
+            publish_task(root, {
+                "task_id": "default-exec-test",
+                "title": "Default executor test",
+                "principal_identity_id": "principal-codex-pc",
+                "contractor_identity_id": "contractor-duoduo",
+                "board_identity_id": "board-duoduo",
+                "status": "published",
+                "board_protocol_version": "1.0",
+            }, "principal-codex-pc")
+
+            c = HermesContractor(root)
+            c.ensure_registered()
+            self.assertIsInstance(c._executor, DefaultExecutionProvider)
+
+            outcome = c.execute_task("default-exec-test")
+            self.assertIn("default-exec-test", outcome["result_file"])
+            self.assertTrue(Path(outcome["result_file"]).exists())
+
+
 if __name__ == "__main__":
     unittest.main()

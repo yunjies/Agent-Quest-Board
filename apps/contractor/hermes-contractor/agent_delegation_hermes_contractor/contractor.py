@@ -5,7 +5,9 @@
 - 从公告板扫描分配给自己的任务。
 - Claim, execute, submit, handle revision。
 - 使用 lifecycle.py 的确定性子例程，不走自定义状态机。
+- 支持可插拔的执行器（ExecutionProvider），方便测试和生产切换。
 """
+import abc
 import json
 from datetime import datetime, timezone
 from pathlib import Path
@@ -23,6 +25,72 @@ from agent_delegation_filesystem.board_store import (
     load_task,
     register_identity,
 )
+
+
+class ExecutionProvider(abc.ABC):
+    """可插拔的任务执行器接口。
+
+    execute() 接收 task 字典，返回执行结果。
+    返回值必须是 dict，包含：
+        "result_file": str  — 结果文件路径
+        "artifacts": dict   — 额外产出物（可选）
+        "execution_log": str — 执行日志内容（可选）
+    """
+
+    @abc.abstractmethod
+    def execute(self, task):
+        """执行一条任务。
+
+        Args:
+            task: dict — 从 board 加载的任务字典
+
+        Returns:
+            dict: {"result_file": str, "artifacts": dict, "execution_log": str}
+        """
+        return {}
+
+
+class DefaultExecutionProvider(ExecutionProvider):
+    """默认执行器 —— 写一个占位结果文件。
+
+    生产环境应替换为真正的 Hermes 执行器。
+    """
+
+    def __init__(self, results_dir, logs_dir, identity_id="contractor-duoduo"):
+        self.results_dir = Path(results_dir)
+        self.logs_dir = Path(logs_dir)
+        self.identity_id = identity_id
+
+    def execute(self, task):
+        task_id = task["task_id"]
+        self.results_dir.mkdir(parents=True, exist_ok=True)
+        self.logs_dir.mkdir(parents=True, exist_ok=True)
+        result = self._build_default_result(task)
+        result_path = self.results_dir / f"{task_id}-result.json"
+        result_path.write_text(
+            json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
+            encoding="utf-8",
+        )
+        execution_log_path = self.logs_dir / f"{task_id}-execution.log"
+        execution_log_path.write_text(
+            f"executed_at: {_now()}\ntask_id: {task_id}\nstatus: done\n",
+            encoding="utf-8",
+        )
+        return {
+            "result_file": str(result_path),
+            "artifacts": result.get("artifacts", {}),
+            "execution_log": str(execution_log_path),
+        }
+
+    def _build_default_result(self, task):
+        return {
+            "task_id": task["task_id"],
+            "title": task.get("title", ""),
+            "contractor_identity_id": self.identity_id,
+            "executed_at": _now(),
+            "status": "completed",
+            "artifacts": {},
+        }
 
 
 CONTRACTOR_IDENTITY = {
@@ -52,9 +120,10 @@ class HermesContractor:
     """Contractor 业务逻辑封装。
 
     所有 board 操作通过 lifecycle.py 的确定性子例程执行。
+    可通过 executor 参数注入自定义 ExecutionProvider。
     """
 
-    def __init__(self, board_root, identity_id=None, results_dir=None, logs_dir=None):
+    def __init__(self, board_root, identity_id=None, results_dir=None, logs_dir=None, executor=None):
         self.board_root = Path(board_root)
         self.identity_id = identity_id or "contractor-duoduo"
         self.results_dir = Path(results_dir) if results_dir else self.board_root / "results"
@@ -62,6 +131,11 @@ class HermesContractor:
         self.store = FilesystemBoardStore(self.board_root)
         self.results_dir.mkdir(parents=True, exist_ok=True)
         self.logs_dir.mkdir(parents=True, exist_ok=True)
+        self._executor = executor or DefaultExecutionProvider(
+            results_dir=self.results_dir,
+            logs_dir=self.logs_dir,
+            identity_id=self.identity_id,
+        )
 
     # ── 身份注册 ──────────────────────────────────────────────
 
@@ -167,39 +241,13 @@ class HermesContractor:
     # ── 执行抽象 ──────────────────────────────────────────────
 
     def execute_task(self, task_id):
-        """抽象的执行入口。smoke 测试中用 mock 覆盖；生产环境调用 Hermes 执行器。
+        """抽象的执行入口。委托给注入的 executor 执行。
 
         返回 dict::
             {"result_file": str, "artifacts": dict, "execution_log": str}
         """
         task = self.store.load_active_task(task_id)
-        # 默认实现：写一个 result 占位文件
-        result = self._build_default_result(task)
-        result_path = self.results_dir / f"{task_id}-result.json"
-        result_path.write_text(
-            json.dumps(result, ensure_ascii=False, indent=2, sort_keys=True) + "\n",
-            encoding="utf-8",
-        )
-        execution_log_path = self.logs_dir / f"{task_id}-execution.log"
-        execution_log_path.write_text(
-            f"executed_at: {_now()}\ntask_id: {task_id}\nstatus: done\n",
-            encoding="utf-8",
-        )
-        return {
-            "result_file": str(result_path),
-            "artifacts": result.get("artifacts", {}),
-            "execution_log": str(execution_log_path),
-        }
-
-    def _build_default_result(self, task):
-        return {
-            "task_id": task["task_id"],
-            "title": task.get("title", ""),
-            "contractor_identity_id": self.identity_id,
-            "executed_at": _now(),
-            "status": "completed",
-            "artifacts": {},
-        }
+        return self._executor.execute(task)
 
 
 def _now():
