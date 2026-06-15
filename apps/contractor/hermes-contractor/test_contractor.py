@@ -1,5 +1,6 @@
 """Tests for HermesContractor."""
 import json
+import sys
 import tempfile
 import unittest
 from pathlib import Path
@@ -427,86 +428,104 @@ class TestExecutionProvider(unittest.TestCase):
 class TestHermesExecutionProvider(unittest.TestCase):
     """Tests for HermesExecutionProvider — the real task executor."""
 
-    def _make_provider(self, tmp):
+    def _make_provider(self, tmp, command=None):
         results_dir = Path(tmp) / "results"
         logs_dir = Path(tmp) / "logs"
         from agent_delegation_hermes_contractor import HermesExecutionProvider
         return HermesExecutionProvider(
             results_dir=results_dir,
             logs_dir=logs_dir,
+            command=command,
         ), results_dir, logs_dir
 
-    def test_execute_with_goal_runs_command(self):
+    def test_execute_with_configured_command_receives_task_payload(self):
         with tempfile.TemporaryDirectory() as tmp:
-            provider, results_dir, logs_dir = self._make_provider(tmp)
+            provider, results_dir, logs_dir = self._make_provider(
+                tmp,
+                command=[
+                    sys.executable,
+                    "-c",
+                    "import json,sys; task=json.load(sys.stdin); print(task['goal'])",
+                ],
+            )
             task = {
                 "task_id": "test-goal-001",
                 "title": "Test with goal",
-                "goal": "echo 'hello from hermes'",
+                "goal": "hello from hermes",
             }
             outcome = provider.execute(task)
             self.assertTrue(Path(outcome["result_file"]).exists())
 
-            # Verify execution log was written
-            log = Path(outcome["execution_log"]).read_text()
+            log = Path(outcome["execution_log"]).read_text(encoding="utf-8")
             self.assertIn("hello from hermes", log)
 
-            # Verify result contains stdout
-            result = json.loads(Path(outcome["result_file"]).read_text())
+            result = json.loads(Path(outcome["result_file"]).read_text(encoding="utf-8"))
             self.assertEqual(result["status"], "completed")
+            self.assertTrue(result["success"])
             self.assertEqual(result["exit_code"], 0)
             self.assertIn("hello from hermes", result["stdout"])
 
-    def test_execute_with_description(self):
+    def test_natural_language_fields_are_not_shell_executed(self):
         with tempfile.TemporaryDirectory() as tmp:
             provider, _, _ = self._make_provider(tmp)
             task = {
                 "task_id": "test-desc-001",
                 "title": "Test with description",
-                "description": "echo 'via description'",
+                "description": "echo should not run",
             }
             outcome = provider.execute(task)
-            log = Path(outcome["execution_log"]).read_text()
-            self.assertIn("via description", log)
+            result = json.loads(Path(outcome["result_file"]).read_text(encoding="utf-8"))
+            self.assertEqual(result["status"], "execution_failed")
+            self.assertFalse(result["success"])
+            self.assertIn("No execution_command", result["error"])
 
-    def test_execute_with_command_field(self):
+    def test_execute_with_task_execution_command(self):
         with tempfile.TemporaryDirectory() as tmp:
             provider, _, _ = self._make_provider(tmp)
             task = {
                 "task_id": "test-cmd-001",
                 "title": "Test with command",
-                "command": "echo 'via command'",
+                "execution_command": [
+                    sys.executable,
+                    "-c",
+                    "import json,sys; task=json.load(sys.stdin); print(task['task_id'])",
+                ],
             }
             outcome = provider.execute(task)
-            log = Path(outcome["execution_log"]).read_text()
-            self.assertIn("via command", log)
+            log = Path(outcome["execution_log"]).read_text(encoding="utf-8")
+            self.assertIn("test-cmd-001", log)
 
-    def test_execute_without_goal_falls_back_to_title(self):
+    def test_title_is_not_shell_executed(self):
         with tempfile.TemporaryDirectory() as tmp:
             provider, _, _ = self._make_provider(tmp)
             task = {
                 "task_id": "test-title-001",
-                "title": "echo 'from title'",
+                "title": "echo should not run",
             }
             outcome = provider.execute(task)
-            log = Path(outcome["execution_log"]).read_text()
-            self.assertIn("from title", log)
+            result = json.loads(Path(outcome["result_file"]).read_text(encoding="utf-8"))
+            self.assertEqual(result["status"], "execution_failed")
+            self.assertNotIn("should not run", result.get("stdout", ""))
 
     def test_execute_failed_command_reports_failure(self):
         with tempfile.TemporaryDirectory() as tmp:
-            provider, _, _ = self._make_provider(tmp)
+            provider, _, _ = self._make_provider(
+                tmp,
+                command=[sys.executable, "-c", "import sys; sys.exit(42)"],
+            )
             task = {
                 "task_id": "test-fail-001",
                 "title": "Failing",
-                "goal": "exit 42",
+                "goal": "natural language task",
             }
             outcome = provider.execute(task)
-            result = json.loads(Path(outcome["result_file"]).read_text())
+            result = json.loads(Path(outcome["result_file"]).read_text(encoding="utf-8"))
             self.assertEqual(result["status"], "execution_failed")
+            self.assertFalse(result["success"])
             self.assertNotEqual(result["exit_code"], 0)
 
-    def test_execute_empty_instructions_fails_observably(self):
-        """当 task 没有任何指令字段时，必须写入 execution_failed。"""
+    def test_execute_without_command_fails_observably(self):
+        """没有显式 runner command 时，必须写入 execution_failed。"""
         with tempfile.TemporaryDirectory() as tmp:
             provider, _, _ = self._make_provider(tmp)
             task = {
@@ -514,9 +533,9 @@ class TestHermesExecutionProvider(unittest.TestCase):
                 "title": "",
             }
             outcome = provider.execute(task)
-            result = json.loads(Path(outcome["result_file"]).read_text())
+            result = json.loads(Path(outcome["result_file"]).read_text(encoding="utf-8"))
             self.assertEqual(result["status"], "execution_failed")
-            self.assertIn("No instructions", result.get("error", ""))
+            self.assertIn("No execution_command", result.get("error", ""))
 
     def test_injected_into_contractor_works(self):
         """HermesExecutionProvider 通过 executor 注入到 HermesContractor 中正常工作。"""
@@ -539,6 +558,11 @@ class TestHermesExecutionProvider(unittest.TestCase):
             provider = HermesExecutionProvider(
                 results_dir=root / "results",
                 logs_dir=root / "logs",
+                command=[
+                    sys.executable,
+                    "-c",
+                    "import json,sys; task=json.load(sys.stdin); print(task['goal'])",
+                ],
             )
             c = HermesContractor(root, executor=provider)
             c.ensure_registered()
@@ -546,7 +570,7 @@ class TestHermesExecutionProvider(unittest.TestCase):
             publish_task(root, {
                 "task_id": "hermes-exec-test",
                 "title": "Hermes exec test",
-                "goal": "echo 'executed by HermesExecutionProvider'",
+                "goal": "executed by HermesExecutionProvider",
                 "principal_identity_id": "principal-codex-pc",
                 "contractor_identity_id": "contractor-duoduo",
                 "board_identity_id": "board-duoduo",
@@ -558,9 +582,60 @@ class TestHermesExecutionProvider(unittest.TestCase):
             c.start_execution("hermes-exec-test")
             outcome = c.execute_task("hermes-exec-test")
 
-            result = json.loads(Path(outcome["result_file"]).read_text())
+            result = json.loads(Path(outcome["result_file"]).read_text(encoding="utf-8"))
             self.assertEqual(result["status"], "completed")
             self.assertIn("executed by HermesExecutionProvider", result["stdout"])
+
+    def test_failed_execution_is_not_submitted_normally(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root = Path(tmp)
+            from agent_delegation_filesystem import init_board, register_identity, publish_task, load_task
+            from agent_delegation_hermes_contractor import HermesContractor, HermesExecutionProvider
+
+            init_board(root)
+            for ident in [
+                {"identity_id": "principal-codex-pc", "agent_id": "agent-codex",
+                 "role_type": "principal", "permissions": ["publish_task"],
+                 "board_protocol_version": "1.0", "status": "active"},
+                {"identity_id": "board-duoduo", "agent_id": "agent-duoduo",
+                 "role_type": "board", "permissions": ["append_event", "transition_status"],
+                 "board_protocol_version": "1.0", "status": "active"},
+            ]:
+                register_identity(root, ident)
+
+            provider = HermesExecutionProvider(
+                results_dir=root / "results",
+                logs_dir=root / "logs",
+                command=[sys.executable, "-c", "import sys; sys.exit(42)"],
+            )
+            c = HermesContractor(root, executor=provider)
+            c.ensure_registered()
+
+            publish_task(root, {
+                "task_id": "hermes-fail-test",
+                "title": "Hermes fail test",
+                "goal": "natural language task",
+                "principal_identity_id": "principal-codex-pc",
+                "contractor_identity_id": "contractor-duoduo",
+                "board_identity_id": "board-duoduo",
+                "status": "published",
+                "board_protocol_version": "1.0",
+            }, "principal-codex-pc")
+
+            c.claim_task("hermes-fail-test")
+            c.start_execution("hermes-fail-test")
+            outcome = c.execute_task("hermes-fail-test")
+
+            with self.assertRaises(HermesContractorError):
+                c.submit_result(
+                    "hermes-fail-test",
+                    result_file=outcome["result_file"],
+                    artifacts=outcome["artifacts"],
+                    execution_log=outcome["execution_log"],
+                )
+
+            task = load_task(root, "hermes-fail-test")
+            self.assertEqual(task["status"], "needs_user_action")
 
 
 if __name__ == "__main__":

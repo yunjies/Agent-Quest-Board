@@ -6,5 +6,8 @@ runtime:
   results_dir: .local/hermes/results
   execution_log_dir: .local/hermes/logs
   execution_provider: hermes  # "default" or "hermes"
+  hermes_runner_command:
+    - python
+    - path/to/hermes_runner.py
 polling:
   fallback_interval_seconds: 30

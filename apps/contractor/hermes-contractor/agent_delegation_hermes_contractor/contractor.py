@@ -95,11 +95,12 @@ class DefaultExecutionProvider(ExecutionProvider):
 
 
 class HermesExecutionProvider(ExecutionProvider):
-    """生产环境 Hermes 执行器 —— 将任务作为指令执行。
+    """生产环境 Hermes 执行器 —— 通过受控命令调用 Hermes runner。
 
     职责：
-    - 从 task 的 ``goal``、``description`` 或 ``command`` 字段提取执行指令。
-    - 通过 subprocess 执行指令，捕获 stdout/stderr 作为 execution_log。
+    - 只执行显式配置的 command 或 task.execution_command。
+    - 将 task 作为 JSON payload 传给 runner 的 stdin。
+    - 捕获 stdout/stderr 作为 execution_log。
     - 执行失败时写入 execution_failed 状态，不伪造成功。
     - 输出符合 ExecutionProvider 接口：result_file / artifacts / execution_log。
 
@@ -115,40 +116,35 @@ class HermesExecutionProvider(ExecutionProvider):
         logs_dir,
         identity_id="contractor-duoduo",
         timeout=300,
-        shell="/bin/sh",
+        command=None,
     ):
         self.results_dir = Path(results_dir)
         self.logs_dir = Path(logs_dir)
         self.identity_id = identity_id
         self.timeout = timeout
-        self.shell = shell
+        self.command = list(command) if command else None
 
     def execute(self, task):
         task_id = task["task_id"]
         self.results_dir.mkdir(parents=True, exist_ok=True)
         self.logs_dir.mkdir(parents=True, exist_ok=True)
 
-        # 从 task 提取指令：goal > description > command > title
-        instructions = (
-            task.get("goal")
-            or task.get("description")
-            or task.get("command")
-            or task.get("title", "")
-        )
+        command = self._resolve_command(task)
+        task_payload = json.dumps(task, ensure_ascii=False, sort_keys=True)
 
         execution_log_path = self.logs_dir / f"{task_id}-execution.log"
         result_path = self.results_dir / f"{task_id}-result.json"
         started_at = _now()
 
-        if not instructions:
-            # 无指令：写入 blocked 结果
+        if not command:
             result = {
                 "task_id": task_id,
                 "title": task.get("title", ""),
                 "contractor_identity_id": self.identity_id,
                 "executed_at": started_at,
                 "status": "execution_failed",
-                "error": "No instructions (goal/description/command/title are all empty)",
+                "success": False,
+                "error": "No execution_command or configured Hermes runner command",
                 "artifacts": {},
             }
             result_path.write_text(
@@ -158,25 +154,26 @@ class HermesExecutionProvider(ExecutionProvider):
             execution_log_path.write_text(
                 f"started_at: {started_at}\n"
                 f"task_id: {task_id}\n"
-                f"instructions: (empty)\n"
-                f"status: execution_failed — no instructions\n",
+                "command: (missing)\n"
+                "status: execution_failed - no configured command\n",
                 encoding="utf-8",
             )
             return {
                 "result_file": str(result_path),
                 "artifacts": {},
                 "execution_log": str(execution_log_path),
+                "success": False,
             }
 
-        # 将指令写入临时 shell 脚本执行
         log_lines = [f"started_at: {started_at}", f"task_id: {task_id}"]
-        log_lines.append(f"instructions: {instructions[:200]}")
+        log_lines.append(f"command: {command}")
         log_lines.append("")
 
         try:
             proc = subprocess.run(
-                [self.shell, "-c", instructions],
+                command,
                 capture_output=True,
+                input=task_payload,
                 text=True,
                 timeout=self.timeout,
             )
@@ -217,12 +214,13 @@ class HermesExecutionProvider(ExecutionProvider):
             "executed_at": started_at,
             "completed_at": completed_at,
             "status": status,
+            "success": exit_code == 0,
             "exit_code": exit_code,
             "stdout": stdout[:10000] if stdout else "",
             "stderr": stderr[:5000] if stderr else "",
             "artifacts": {
                 "execution_log": str(execution_log_path),
-                "instructions": instructions,
+                "execution_command": command,
             },
         }
         result_path.write_text(
@@ -234,7 +232,19 @@ class HermesExecutionProvider(ExecutionProvider):
             "result_file": str(result_path),
             "artifacts": result["artifacts"],
             "execution_log": str(execution_log_path),
+            "success": exit_code == 0,
+            "status": status,
         }
+
+    def _resolve_command(self, task):
+        command = self.command if self.command else task.get("execution_command")
+        if not command:
+            return None
+        if isinstance(command, str):
+            return None
+        if not isinstance(command, (list, tuple)) or not command:
+            return None
+        return [str(part) for part in command]
 
 
 CONTRACTOR_IDENTITY = {
@@ -332,6 +342,12 @@ class HermesContractor:
         if not result_file:
             result_file = str(self.results_dir / f"{task_id}-result.json")
 
+        if self._result_indicates_execution_failed(result_file):
+            self.mark_blocked(task_id, "execution failed; see result_file and execution_log")
+            raise HermesContractorError(
+                "execution failed; task marked needs_user_action instead of submitted"
+            )
+
         # 持久化 execution_log 到 task snapshot
         if execution_log:
             task["execution_log"] = execution_log
@@ -351,6 +367,13 @@ class HermesContractor:
         )
 
         return result
+
+    def _result_indicates_execution_failed(self, result_file):
+        try:
+            result = json.loads(Path(result_file).read_text(encoding="utf-8"))
+        except Exception:
+            return False
+        return result.get("status") in {"execution_failed", "failed"} or result.get("success") is False
 
     # ── 异常处理 ──────────────────────────────────────────────
 
