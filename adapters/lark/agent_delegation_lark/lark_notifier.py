@@ -12,7 +12,6 @@ Lark / Feishu Notifier — 飞书通知发送器。
 """
 import logging
 import subprocess
-from pathlib import Path
 
 logger = logging.getLogger(__name__)
 
@@ -37,7 +36,7 @@ class LarkNotifier:
 
     使用方式：:
 
-        notifier = LarkNotifier(topic_group_id="oc_example_group", dry_run=True)
+        notifier = LarkNotifier(topic_group_id="example-topic-group", dry_run=True)
         for notif in board.batch_process_events(events, tasks=tasks):
             notifier.dispatch(notif)
 
@@ -72,23 +71,27 @@ class LarkNotifier:
         if notification is None:
             return {"notification_type": None, "success": True}
 
-        result = {"notification_type": notification.get("event_type"), "success": False}
+        result = {
+            "notification_type": notification.get("event_type"),
+            "success": False,
+            "errors": [],
+            "failed_actions": [],
+        }
 
         try:
             topic_id = notification.get("topic_id")
             body = notification.get("body", "")
             title = notification.get("title", "")
-            action = notification.get("action", "none")
             needs_topic = notification.get("needs_topic_creation", False)
             pending_close = notification.get("pending_close", False)
             route = notification.get("route", "")
-            to = notification.get("to", "unknown")
 
             # ── 创建话题 ──────────────────────────────
             if needs_topic and self.topic_group_id:
                 topic_result = self._create_topic(title, body, notification)
                 result["topic_created"] = topic_result.get("success", False)
                 result["topic_id"] = topic_result.get("topic_id")
+                self._record_action_result(result, "create_topic", topic_result)
 
             # ── 发送消息到话题 ──────────────────────────
             if topic_id:
@@ -98,11 +101,13 @@ class LarkNotifier:
                 )
                 result["message_sent"] = send_result.get("success", False)
                 result["message_id"] = send_result.get("message_id")
+                self._record_action_result(result, "send_message", send_result)
 
             # ── 话题关闭 ──────────────────────────────
             if pending_close:
                 close_result = self._close_topic(notification)
                 result["close_initiated"] = close_result.get("success", False)
+                self._record_action_result(result, "close_topic", close_result)
 
             # ── 异常通知 ──────────────────────────────
             if route == "notify_incident" and self.incident_chat_id:
@@ -111,12 +116,20 @@ class LarkNotifier:
                     body=f"[{title}] {body}",
                 )
                 result["incident_notified"] = incident_result.get("success", False)
+                self._record_action_result(result, "notify_incident", incident_result)
 
-            result["success"] = True
+            result["success"] = not result["failed_actions"]
 
         except Exception as e:
             logger.error("dispatch failed for notification %s: %s", notification.get("event_type"), e)
             result["error"] = str(e)
+            result["errors"].append(str(e))
+            result["failed_actions"].append({"action": "dispatch", "error": str(e)})
+
+        if not result["errors"]:
+            result.pop("errors")
+        if not result["failed_actions"]:
+            result.pop("failed_actions")
 
         return result
 
@@ -251,3 +264,10 @@ class LarkNotifier:
             list[dict] — 每条通知的发送结果
         """
         return [self.dispatch(n) for n in notifications]
+
+    def _record_action_result(self, result, action, action_result):
+        if action_result.get("success"):
+            return
+        error = action_result.get("error") or f"{action} failed"
+        result["errors"].append(error)
+        result["failed_actions"].append({"action": action, "error": error})

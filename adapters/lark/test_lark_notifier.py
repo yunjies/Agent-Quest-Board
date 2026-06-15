@@ -1,9 +1,6 @@
 """Tests for LarkNotifier — 飞书通知发送器。"""
-import json
-import os
 import tempfile
 import unittest
-from pathlib import Path
 
 from agent_delegation_lark import LarkNotifier, LarkNotifierError
 # We use the board-interface's LarkTopicBoard to generate notifications
@@ -28,8 +25,8 @@ class LarkNotifierDryRunTest(unittest.TestCase):
 
     def setUp(self):
         self.notifier = LarkNotifier(
-            topic_group_id="oc_example_group",
-            incident_chat_id="oc_example_incident",
+            topic_group_id="example-topic-group",
+            incident_chat_id="example-incident-chat",
             dry_run=True,
         )
 
@@ -112,14 +109,88 @@ class LarkNotifierEdgeCaseTest(unittest.TestCase):
         """If lark-cli doesn't exist, should not crash in dry_run=False."""
         # When in production mode with invalid CLI, should catch FileNotFoundError
         notifier = LarkNotifier(
-            topic_group_id="oc_example_group",
+            topic_group_id="example-topic-group",
             dry_run=False,
             lark_cli_bin="/nonexistent/binary",
         )
         notif = _notification("task_published")
         # Should not crash
         result = notifier.dispatch(notif)
+        self.assertFalse(result["success"])
         self.assertFalse(result.get("topic_created", False))
+        self.assertIn("failed_actions", result)
+        self.assertEqual(result["failed_actions"][0]["action"], "create_topic")
+
+    def test_send_message_failure_marks_dispatch_failed(self):
+        notifier = LarkNotifier(dry_run=True)
+        notifier._send_message = lambda chat_id, body: {
+            "success": False,
+            "error": "send failed",
+        }
+        notif = _notification("result_submitted")
+        notif["topic_id"] = "existing-topic"
+
+        result = notifier.dispatch(notif)
+
+        self.assertFalse(result["success"])
+        self.assertFalse(result["message_sent"])
+        self.assertEqual(result["failed_actions"][0]["action"], "send_message")
+        self.assertIn("send failed", result["errors"])
+
+    def test_close_topic_failure_marks_dispatch_failed(self):
+        notifier = LarkNotifier(dry_run=True)
+        notifier._close_topic = lambda notification: {
+            "success": False,
+            "error": "close failed",
+        }
+        notif = _notification("review_approved")
+        notif["topic_id"] = "existing-topic"
+
+        result = notifier.dispatch(notif)
+
+        self.assertFalse(result["success"])
+        self.assertFalse(result["close_initiated"])
+        self.assertEqual(result["failed_actions"][0]["action"], "close_topic")
+        self.assertIn("close failed", result["errors"])
+
+    def test_incident_notify_failure_marks_dispatch_failed(self):
+        notifier = LarkNotifier(
+            incident_chat_id="example-incident-chat",
+            dry_run=True,
+        )
+        notifier._send_message = lambda chat_id, body: {
+            "success": False,
+            "error": "incident failed",
+        }
+        notif = _notification("incident_created", extra={"error": "API timeout"})
+
+        result = notifier.dispatch(notif)
+
+        self.assertFalse(result["success"])
+        self.assertFalse(result["incident_notified"])
+        self.assertEqual(result["failed_actions"][0]["action"], "notify_incident")
+        self.assertIn("incident failed", result["errors"])
+
+    def test_dispatch_batch_preserves_individual_failures(self):
+        notifier = LarkNotifier(dry_run=True)
+        notif_ok = _notification("task_published")
+        notif_fail = _notification("result_submitted")
+        notif_fail["topic_id"] = "existing-topic"
+
+        original_send = notifier._send_message
+
+        def send_message(chat_id, body):
+            if chat_id == "existing-topic":
+                return {"success": False, "error": "send failed"}
+            return original_send(chat_id, body)
+
+        notifier._send_message = send_message
+
+        results = notifier.dispatch_batch([notif_ok, notif_fail])
+
+        self.assertEqual(len(results), 2)
+        self.assertTrue(results[0]["success"])
+        self.assertFalse(results[1]["success"])
 
     def test_empty_notification_dict(self):
         """Edge case: empty notification dict."""
