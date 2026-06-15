@@ -1,7 +1,7 @@
 {
-  "component_id": "contractor-duoduo-example",
+  "component_id": "contractor-duoduo",
   "component_type": "contractor",
-  "implementation_version": "0.1.0",
+  "implementation_version": "0.2.0",
   "board_protocol_version": "1.0",
   "supported_protocol_versions": ["1.0"],
   "capabilities": [

@@ -4,6 +4,7 @@ from .contractor import (
     ExecutionProvider,
     HermesContractor,
     HermesContractorError,
+    HermesExecutionProvider,
 )
 
 __all__ = [
@@ -12,4 +13,5 @@ __all__ = [
     "ExecutionProvider",
     "HermesContractor",
     "HermesContractorError",
+    "HermesExecutionProvider",
 ]

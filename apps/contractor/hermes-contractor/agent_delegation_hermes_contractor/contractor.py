@@ -9,6 +9,7 @@
 """
 import abc
 import json
+import subprocess
 from datetime import datetime, timezone
 from pathlib import Path
 
@@ -90,6 +91,149 @@ class DefaultExecutionProvider(ExecutionProvider):
             "executed_at": _now(),
             "status": "completed",
             "artifacts": {},
+        }
+
+
+class HermesExecutionProvider(ExecutionProvider):
+    """生产环境 Hermes 执行器 —— 将任务作为指令执行。
+
+    职责：
+    - 从 task 的 ``goal``、``description`` 或 ``command`` 字段提取执行指令。
+    - 通过 subprocess 执行指令，捕获 stdout/stderr 作为 execution_log。
+    - 执行失败时写入 execution_failed 状态，不伪造成功。
+    - 输出符合 ExecutionProvider 接口：result_file / artifacts / execution_log。
+
+    使用方式：
+
+        provider = HermesExecutionProvider(results_dir=..., logs_dir=...)
+        contractor = HermesContractor(board_root=..., executor=provider)
+    """
+
+    def __init__(
+        self,
+        results_dir,
+        logs_dir,
+        identity_id="contractor-duoduo",
+        timeout=300,
+        shell="/bin/sh",
+    ):
+        self.results_dir = Path(results_dir)
+        self.logs_dir = Path(logs_dir)
+        self.identity_id = identity_id
+        self.timeout = timeout
+        self.shell = shell
+
+    def execute(self, task):
+        task_id = task["task_id"]
+        self.results_dir.mkdir(parents=True, exist_ok=True)
+        self.logs_dir.mkdir(parents=True, exist_ok=True)
+
+        # 从 task 提取指令：goal > description > command > title
+        instructions = (
+            task.get("goal")
+            or task.get("description")
+            or task.get("command")
+            or task.get("title", "")
+        )
+
+        execution_log_path = self.logs_dir / f"{task_id}-execution.log"
+        result_path = self.results_dir / f"{task_id}-result.json"
+        started_at = _now()
+
+        if not instructions:
+            # 无指令：写入 blocked 结果
+            result = {
+                "task_id": task_id,
+                "title": task.get("title", ""),
+                "contractor_identity_id": self.identity_id,
+                "executed_at": started_at,
+                "status": "execution_failed",
+                "error": "No instructions (goal/description/command/title are all empty)",
+                "artifacts": {},
+            }
+            result_path.write_text(
+                json.dumps(result, ensure_ascii=False, indent=2) + "\n",
+                encoding="utf-8",
+            )
+            execution_log_path.write_text(
+                f"started_at: {started_at}\n"
+                f"task_id: {task_id}\n"
+                f"instructions: (empty)\n"
+                f"status: execution_failed — no instructions\n",
+                encoding="utf-8",
+            )
+            return {
+                "result_file": str(result_path),
+                "artifacts": {},
+                "execution_log": str(execution_log_path),
+            }
+
+        # 将指令写入临时 shell 脚本执行
+        log_lines = [f"started_at: {started_at}", f"task_id: {task_id}"]
+        log_lines.append(f"instructions: {instructions[:200]}")
+        log_lines.append("")
+
+        try:
+            proc = subprocess.run(
+                [self.shell, "-c", instructions],
+                capture_output=True,
+                text=True,
+                timeout=self.timeout,
+            )
+            stdout = proc.stdout or ""
+            stderr = proc.stderr or ""
+            exit_code = proc.returncode
+        except subprocess.TimeoutExpired:
+            stdout = ""
+            stderr = f"Execution timed out after {self.timeout}s"
+            exit_code = -1
+        except Exception as exc:
+            stdout = ""
+            stderr = f"Execution error: {exc}"
+            exit_code = -2
+
+        completed_at = _now()
+        log_lines.append(f"completed_at: {completed_at}")
+        log_lines.append(f"exit_code: {exit_code}")
+        log_lines.append("--- stdout ---")
+        log_lines.append(stdout)
+        log_lines.append("--- stderr ---")
+        log_lines.append(stderr)
+
+        execution_log_path.write_text("\n".join(log_lines) + "\n", encoding="utf-8")
+
+        if exit_code == 0:
+            status = "completed"
+        elif exit_code in (-1, -2):
+            status = "execution_failed"
+            # 超时/异常视为 blocked
+        else:
+            status = "execution_failed"
+
+        result = {
+            "task_id": task_id,
+            "title": task.get("title", ""),
+            "contractor_identity_id": self.identity_id,
+            "executed_at": started_at,
+            "completed_at": completed_at,
+            "status": status,
+            "exit_code": exit_code,
+            "stdout": stdout[:10000] if stdout else "",
+            "stderr": stderr[:5000] if stderr else "",
+            "artifacts": {
+                "execution_log": str(execution_log_path),
+                "instructions": instructions,
+            },
+        }
+        result_path.write_text(
+            json.dumps(result, ensure_ascii=False, indent=2) + "\n",
+            encoding="utf-8",
+        )
+
+        return {
+            "result_file": str(result_path),
+            "artifacts": result["artifacts"],
+            "execution_log": str(execution_log_path),
         }
 
 

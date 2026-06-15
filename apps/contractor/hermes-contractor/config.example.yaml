@@ -1,9 +1,10 @@
-component_id: contractor-duoduo-example
+component_id: contractor-duoduo
 contractor_identity_id: contractor-duoduo
 board_protocol_version: "1.0"
 runtime:
   board_root: .local/board
   results_dir: .local/hermes/results
   execution_log_dir: .local/hermes/logs
+  execution_provider: hermes  # "default" or "hermes"
 polling:
   fallback_interval_seconds: 30
