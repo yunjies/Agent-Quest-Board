@@ -1,10 +1,10 @@
 __pycache__/
 .pytest_cache/
 .venv/
+.local/
 *.pyc
 *.pyo
 *.pyd
 *.log
 *.local.*
 board.local.yaml
-
