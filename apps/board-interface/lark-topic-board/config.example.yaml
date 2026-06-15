@@ -1,4 +1,4 @@
-frontend_id: lark-topic-board-example
+frontend_id: lark-topic-board
 board_protocol_version: "1.0"
 lark:
   app_id: example-app-id
@@ -9,3 +9,6 @@ mapping:
 notifications:
   route_all_task_events_to_topic: true
   incident_channel: example-incident-channel
+notifier:
+  dry_run: true
+  lark_cli_bin: lark-cli
