@@ -30,11 +30,24 @@ from pathlib import Path
 
 NOTIFICATION_TYPES = {
     "task_published": "notify_contractor",
+    "task_claimed": "notify_task_claimed",
+    "execution_started": "notify_execution_started",
     "result_submitted": "notify_principal",
     "review_rejected": "notify_contractor_revision",
     "review_approved": "notify_closing",
     "task_closed": "close_topic",
     "incident_created": "notify_incident",
+}
+
+STATUS_LABELS = {
+    "task_published": "进行中",
+    "task_claimed": "进行中",
+    "execution_started": "进行中",
+    "result_submitted": "待验收",
+    "review_rejected": "返工中",
+    "review_approved": "待关闭",
+    "task_closed": "已关闭",
+    "incident_created": "异常",
 }
 
 
@@ -46,6 +59,18 @@ EVENT_MESSAGES = {
         "title": "新任务待领取",
         "body": "任务 {task_id}「{title}」已发布。请领取后开始执行。",
         "action": "claim_task",
+    },
+    "task_claimed": {
+        "to": "both",
+        "title": "乙方已接单",
+        "body": "任务 {task_id}「{title}」已由乙方接单。下一步：开始执行。",
+        "action": "none",
+    },
+    "execution_started": {
+        "to": "both",
+        "title": "乙方开始执行",
+        "body": "任务 {task_id}「{title}」已开始执行。下一步：等待乙方提交结果。",
+        "action": "none",
     },
     "result_submitted": {
         "to": "principal",
@@ -116,6 +141,8 @@ class LarkTopicBoard:
         """标记话题为已关闭。"""
         if task_id in self._topic_map:
             self._topic_map[task_id]["status"] = "closed"
+            self._topic_map[task_id]["status_label"] = "已关闭"
+            self._topic_map[task_id]["display_title"] = f"[已关闭] {task_id}"
             self._topic_map[task_id]["closed_at"] = _now()
             self._save_map()
 
@@ -150,6 +177,7 @@ class LarkTopicBoard:
 
         route = NOTIFICATION_TYPES[event_type]
         template = EVENT_MESSAGES.get(event_type, {})
+        status_label = STATUS_LABELS.get(event_type, "进行中")
         body = template.get("body", "").format(
             task_id=task_id,
             title=title,
@@ -164,6 +192,9 @@ class LarkTopicBoard:
             "to": template.get("to", "unknown"),
             "title": template.get("title", ""),
             "body": body,
+            "display_message": f"[{status_label}] {body}",
+            "status_label": status_label,
+            "display_title": _display_title(status_label, task_id, title),
             "action": template.get("action", "none"),
             "topic_id": self.get_topic_for_task(task_id),
         }
@@ -175,6 +206,19 @@ class LarkTopicBoard:
         # 特殊处理：review_approved → 准备关闭话题
         if event_type == "review_approved":
             notification["pending_close"] = True
+
+        # 特殊处理：task_closed → 逻辑关闭话题。物理关闭取决于 Lark API 能力。
+        if event_type == "task_closed":
+            self.close_topic(task_id)
+            notification["pending_close"] = True
+            notification["logical_close"] = True
+
+        if event_type in ("task_published", "task_claimed", "execution_started", "result_submitted", "review_rejected", "review_approved", "task_closed", "incident_created"):
+            notification["topic_update"] = {
+                "mode": "title_or_status_message",
+                "display_title": notification["display_title"],
+                "status_label": status_label,
+            }
 
         return notification
 
@@ -208,3 +252,8 @@ class LarkTopicBoard:
 
 def _now():
     return datetime.now(timezone.utc).isoformat()
+
+
+def _display_title(status_label, task_id, title):
+    clean_title = title or "未命名任务"
+    return f"[{status_label}] {task_id} {clean_title}"

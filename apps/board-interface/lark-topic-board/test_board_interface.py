@@ -66,6 +66,9 @@ class LarkTopicBoardTest(unittest.TestCase):
         self.assertEqual(notif["route"], "notify_contractor")
         self.assertEqual(notif["to"], "contractor")
         self.assertTrue(notif["needs_topic_creation"])
+        self.assertEqual(notif["status_label"], "进行中")
+        self.assertIn("[进行中]", notif["display_message"])
+        self.assertEqual(notif["topic_update"]["status_label"], "进行中")
 
     def test_result_submitted_notification(self):
         board = LarkTopicBoard(mapping_store=tempfile.mktemp(suffix=".json"))
@@ -76,6 +79,8 @@ class LarkTopicBoardTest(unittest.TestCase):
         self.assertIsNotNone(notif)
         self.assertEqual(notif["route"], "notify_principal")
         self.assertEqual(notif["to"], "principal")
+        self.assertEqual(notif["status_label"], "待验收")
+        self.assertTrue(notif["display_title"].startswith("[待验收]"))
 
     def test_review_rejected_notification(self):
         board = LarkTopicBoard(mapping_store=tempfile.mktemp(suffix=".json"))
@@ -87,6 +92,7 @@ class LarkTopicBoardTest(unittest.TestCase):
         self.assertEqual(notif["route"], "notify_contractor_revision")
         self.assertEqual(notif["to"], "contractor")
         self.assertIn("Add test", notif["body"])
+        self.assertEqual(notif["status_label"], "返工中")
 
     def test_review_approved_notification(self):
         board = LarkTopicBoard(mapping_store=tempfile.mktemp(suffix=".json"))
@@ -98,14 +104,22 @@ class LarkTopicBoardTest(unittest.TestCase):
         self.assertIsNotNone(notif)
         self.assertTrue(notif["pending_close"])
         self.assertEqual(notif["topic_id"]["topic_id"], "example-topic-123")
+        self.assertEqual(notif["status_label"], "待关闭")
+        self.assertTrue(board.is_topic_active("task-001"))
 
     def test_task_closed_notification(self):
         board = LarkTopicBoard(mapping_store=tempfile.mktemp(suffix=".json"))
+        board.assign_topic("task-001", "example-topic-123")
         event = _event("task_closed")
         notif = board.handle_event(event)
 
         self.assertIsNotNone(notif)
         self.assertEqual(notif["route"], "close_topic")
+        self.assertTrue(notif["pending_close"])
+        self.assertTrue(notif["logical_close"])
+        self.assertEqual(notif["status_label"], "已关闭")
+        self.assertFalse(board.is_topic_active("task-001"))
+        self.assertEqual(board.get_topic_for_task("task-001")["status"], "closed")
 
     def test_incident_notification(self):
         board = LarkTopicBoard(mapping_store=tempfile.mktemp(suffix=".json"))

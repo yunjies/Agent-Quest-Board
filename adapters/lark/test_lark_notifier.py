@@ -44,6 +44,8 @@ class LarkNotifierDryRunTest(unittest.TestCase):
         result = self.notifier.dispatch(notif)
         self.assertTrue(result["success"])
         self.assertTrue(result.get("message_sent"))
+        self.assertTrue(result.get("topic_status_updated"))
+        self.assertEqual(result.get("topic_status_update_mode"), "dry_run_status_update")
 
     def test_dispatch_review_rejected(self):
         notif = _notification("review_rejected", extra={"revision_request": "Add tests"})
@@ -58,6 +60,7 @@ class LarkNotifierDryRunTest(unittest.TestCase):
         result = self.notifier.dispatch(notif)
         self.assertTrue(result["success"])
         self.assertTrue(result.get("close_initiated"))
+        self.assertTrue(result.get("topic_status_updated"))
 
     def test_dispatch_incident(self):
         notif = _notification("incident_created", extra={"error": "API timeout"})
@@ -91,6 +94,15 @@ class LarkNotifierDryRunTest(unittest.TestCase):
         self.assertEqual(len(results), 3)
         for r in results:
             self.assertTrue(r["success"])
+
+    def test_task_closed_is_logical_close(self):
+        notif = _notification("task_closed")
+        notif["topic_id"] = "existing-topic"
+        result = self.notifier.dispatch(notif)
+
+        self.assertTrue(result["success"])
+        self.assertTrue(result["close_initiated"])
+        self.assertTrue(result["topic_status_updated"])
 
     def test_no_topic_group_no_creation(self):
         """When topic_group_id is None, needs_topic_creation should not create a topic."""

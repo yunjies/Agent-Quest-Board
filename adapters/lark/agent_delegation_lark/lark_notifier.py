@@ -84,7 +84,14 @@ class LarkNotifier:
             title = notification.get("title", "")
             needs_topic = notification.get("needs_topic_creation", False)
             pending_close = notification.get("pending_close", False)
+            topic_update = notification.get("topic_update")
             route = notification.get("route", "")
+
+            if topic_update:
+                update_result = self._update_topic_status(notification)
+                result["topic_status_updated"] = update_result.get("success", False)
+                result["topic_status_update_mode"] = update_result.get("mode")
+                self._record_action_result(result, "update_topic_status", update_result)
 
             # ── 创建话题 ──────────────────────────────
             if needs_topic and self.topic_group_id:
@@ -97,7 +104,7 @@ class LarkNotifier:
             if topic_id:
                 send_result = self._send_message(
                     chat_id=topic_id if isinstance(topic_id, str) else topic_id.get("topic_id"),
-                    body=body,
+                    body=notification.get("display_message") or body,
                 )
                 result["message_sent"] = send_result.get("success", False)
                 result["message_id"] = send_result.get("message_id")
@@ -232,13 +239,17 @@ class LarkNotifier:
     def _close_topic(self, notification):
         """关闭话题。
 
-        当前实现：向话题发送关闭标记消息。
-        后续可扩展为修改群聊名称或归档。
+        当前实现：逻辑关闭。优先发送 [已关闭] 状态消息；如果 Lark CLI
+        后续支持物理关闭/归档，可以在这里扩展。
         """
         task_id = notification.get("task_id", "unknown")
         if self.dry_run:
             logger.info("[DRY-RUN] would close topic for task_id=%s", task_id)
-            return {"success": True}
+            return {
+                "success": True,
+                "mode": "logical_close",
+                "physical_close_supported": False,
+            }
 
         topic_id = notification.get("topic_id")
         if not topic_id:
@@ -249,10 +260,56 @@ class LarkNotifier:
             return {"success": False, "error": "no resolved chat_id"}
 
         # 发送关闭标记消息
-        return self._send_message(
+        result = self._send_message(
             chat_id=chat_id,
             body=f"[任务已关闭] {task_id} — 此任务已完成，话题即将归档。",
         )
+        result["mode"] = "logical_close"
+        result["physical_close_supported"] = False
+        return result
+
+    def _update_topic_status(self, notification):
+        """更新话题可见状态。
+
+        Lark topic title editing is platform/CLI dependent. The adapter exposes a
+        stable logical action and degrades to a status message when direct title
+        editing is unavailable.
+        """
+        update = notification.get("topic_update") or {}
+        display_title = update.get("display_title") or notification.get("title", "")
+        status_label = update.get("status_label", "")
+        topic_id = notification.get("topic_id")
+
+        if self.dry_run:
+            logger.info("[DRY-RUN] would update topic status title=%s", display_title)
+            return {
+                "success": True,
+                "mode": "dry_run_status_update",
+                "display_title": display_title,
+                "status_label": status_label,
+                "physical_title_edit_supported": False,
+            }
+
+        if not topic_id:
+            return {
+                "success": True,
+                "mode": "deferred_until_topic_exists",
+                "display_title": display_title,
+                "status_label": status_label,
+                "physical_title_edit_supported": False,
+            }
+
+        chat_id = topic_id if isinstance(topic_id, str) else topic_id.get("topic_id")
+        if not chat_id:
+            return {"success": False, "error": "no resolved chat_id for status update"}
+
+        message = f"[状态更新] {display_title}"
+        result = self._send_message(chat_id=chat_id, body=message)
+        result["mode"] = "status_message_fallback"
+        result["display_title"] = display_title
+        result["status_label"] = status_label
+        result["physical_title_edit_supported"] = False
+        return result
 
     def dispatch_batch(self, notifications):
         """批量发送通知。
