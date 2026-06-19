@@ -65,3 +65,17 @@ Codex 侧当前实现范围：
 - 验收不通过必须给出可执行修改意见。
 
 关闭动作由公告板在甲方 `approved` 后执行。
+## Task Identity Rules
+
+甲方发布的是 task draft，不是最终 task snapshot。新任务 draft 不应包含 `task_id`。
+
+甲方必须提供或保存：
+
+```text
+client_request_id  甲方本地请求追踪 ID
+idempotency_key    重复提交保护 key
+```
+
+公告板收到 draft 后生成 canonical `task_id`，并在 `publish_task` 返回值中交还甲方。甲方后续验收、驳回、评分和追踪都必须使用公告板返回的 `task_id`。
+
+甲方不能再使用每日序号（例如 `20260619-01`）作为新任务主键；这类旧 ID 只能作为 `legacy_task_id` 或本地备注。

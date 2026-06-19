@@ -36,3 +36,16 @@ PYTHONPATH="packages/board-core;adapters/filesystem" python -m unittest discover
 这些动作会写任务快照和 `{task_id}.jsonl` 事件日志。生命周期规则来自 `packages/board-core/agent_delegation_board/lifecycle.py`，filesystem adapter 只负责文件读写和事件落盘。
 
 Lark、AgentOps、数据库或其他存储适配器后续应复用同一个 lifecycle API，而不是另起一套流程。
+## Task Identity & Idempotency
+
+Filesystem adapter persists board-owned task identity data.
+
+New tasks published through `publish_task` receive a canonical `task_id` from the board. The adapter records idempotency mappings in:
+
+```text
+registry/idempotency.json
+```
+
+The idempotency key is scoped by `principal_identity_id`, so duplicate submissions from the same principal return the same existing `task_id` when possible.
+
+Legacy imported tasks may already contain `task_id`; those are preserved for compatibility, but new task creation should rely on board-generated IDs.

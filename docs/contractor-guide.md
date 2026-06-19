@@ -62,3 +62,10 @@ apps/contractor/hermes-contractor
 - 不能关闭任务。
 - 返工必须针对同一个 `task_id`。
 - 没有足够上下文时应 `request_clarification`，而不是猜。
+## Task Identity Rules
+
+乙方只消费公告板分配的 canonical `task_id`。
+
+乙方提交结果、返工、阻塞、澄清和执行日志时，都必须引用同一个 `task_id`。乙方不应根据标题、日期序号或甲方本地 `client_request_id` 推导任务身份。
+
+如果任务包含 `legacy_task_id`，它只能用于展示或迁移排查，不能作为状态流转、结果提交或返工的主键。

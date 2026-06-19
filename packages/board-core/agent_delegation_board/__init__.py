@@ -8,6 +8,7 @@ from .permissions import (
     check_role_capability,
 )
 from .state_machine import StateTransitionError, transition
+from .task_identity import generate_task_id
 from .validation import (
     ProtocolValidationError,
     validate_event,
@@ -26,6 +27,7 @@ __all__ = [
     "check_component_compatibility",
     "check_identity_capability",
     "check_role_capability",
+    "generate_task_id",
     "is_known_event_type",
     "transition",
     "validate_event",

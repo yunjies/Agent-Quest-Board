@@ -16,3 +16,16 @@
 - `build_task_spec`
 
 低分任务不能在没有 `acceptance_tests` 的情况下发布。这样可以避免模糊委托直接变成乙方猜测。
+## Task Draft Output
+
+`build_task_spec` produces a principal-owned draft. It intentionally does not create `task_id`.
+
+The principal SDK writes:
+
+```text
+client_request_id
+idempotency_key
+status=draft
+```
+
+The board creates the canonical `task_id` when `publish_task` is called. Principal implementations must persist the returned `task_id` before tracking, reviewing, or scoring the task.

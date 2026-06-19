@@ -39,8 +39,11 @@ class PrincipalTaskBuilderTest(unittest.TestCase):
 
         payload = build_task_spec(task_input)
 
-        self.assertEqual(payload["status"], "published")
+        self.assertEqual(payload["status"], "draft")
+        self.assertNotIn("task_id", payload)
         self.assertEqual(payload["principal_identity_id"], "principal-codex-pc")
+        self.assertIn("client_request_id", payload)
+        self.assertIn("idempotency_key", payload)
         self.assertGreaterEqual(payload["delegation_score"], 5)
         self.assertIn(payload["acceptance_level"], {"smoke_required", "test_required"})
 

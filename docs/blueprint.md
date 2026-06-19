@@ -150,3 +150,29 @@ Codex = 甲方 principal-codex-pc
 ```
 
 多多同时承担乙方和公告板承载时，必须严格身份隔离：乙方可以执行任务，公告板只能处理状态和通知。
+## Task Identity & Idempotency
+
+`task_id` 是公告板生成的 canonical ID，是全系统主键。甲方不能为新任务自定义 `task_id`。
+
+发布流程必须是：
+
+```text
+principal builds task draft
+-> board publish_task(draft)
+-> board generates task_id
+-> board writes snapshot/event log
+-> board returns canonical task_id
+```
+
+三个 ID 的边界：
+
+```text
+task_id            Board-owned canonical ID, e.g. aq_20260619T112015432Z_K7P3
+client_request_id  Principal-owned request tracking ID; not a primary key
+idempotency_key    Principal-provided key used by the board to return an existing task_id for duplicate submissions
+legacy_task_id     Compatibility alias for imported pre-board-generated IDs
+```
+
+公告板拥有 `task_id`、topic/thread 映射和事件 ID 的生成权。甲方拥有任务意图、验收标准、`client_request_id` 和 `idempotency_key`。乙方只使用 canonical `task_id` 接单、提交结果和返工。
+
+历史形如 `20260619-01` 或 `task-example-001` 的 ID 只能作为 `legacy_task_id` 或 fixture/import 兼容字段，不应作为新任务主键。

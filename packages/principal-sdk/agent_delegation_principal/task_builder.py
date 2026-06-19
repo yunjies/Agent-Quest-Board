@@ -1,6 +1,6 @@
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from hashlib import sha1
+from hashlib import sha256
 
 
 class PrincipalTaskError(ValueError):
@@ -20,6 +20,8 @@ class DelegationInput:
     acceptance_tests: list[str] = field(default_factory=list)
     constraints: list[str] = field(default_factory=list)
     artifacts: dict = field(default_factory=dict)
+    client_request_id: str = ""
+    idempotency_key: str = ""
 
 
 def score_delegation(task_input):
@@ -62,22 +64,27 @@ def build_task_spec(task_input):
             "low-score tasks must include acceptance_tests before publishing"
         )
 
-    task_id = _stable_task_id(
+    client_request_id = task_input.client_request_id.strip() or _client_request_id(
+        task_input.title,
+        task_input.principal_identity_id,
+    )
+    idempotency_key = task_input.idempotency_key.strip() or _idempotency_key(
         task_input.title,
         task_input.principal_identity_id,
         task_input.contractor_identity_id,
-        task_input.description,
+        description,
     )
     now = datetime.now(timezone.utc).isoformat()
     return {
-        "task_id": task_id,
         "title": task_input.title.strip(),
         "description": description,
         "principal_identity_id": task_input.principal_identity_id,
         "contractor_identity_id": task_input.contractor_identity_id,
         "board_identity_id": task_input.board_identity_id,
-        "status": "published",
+        "status": "draft",
         "board_protocol_version": task_input.board_protocol_version,
+        "client_request_id": client_request_id,
+        "idempotency_key": idempotency_key,
         "task_kind": task_input.task_kind,
         "delegation_score": delegation_score,
         "score_breakdown": score_breakdown,
@@ -104,10 +111,18 @@ def _score_range(value, low, high, low_score, high_score):
     return int(round(low_score + ratio * (high_score - low_score)))
 
 
-def _stable_task_id(title, principal_identity_id, contractor_identity_id, description):
-    digest = sha1(
+def _client_request_id(title, principal_identity_id):
+    slug = "".join(
+        part.lower() if part.isalnum() else "-"
+        for part in title.strip()
+    ).strip("-")
+    slug = "-".join(part for part in slug.split("-") if part)[:48] or "request"
+    return f"{principal_identity_id}:{slug}"
+
+
+def _idempotency_key(title, principal_identity_id, contractor_identity_id, description):
+    return sha256(
         f"{title}|{principal_identity_id}|{contractor_identity_id}|{description}".encode(
             "utf-8"
         )
-    ).hexdigest()[:12]
-    return f"task-{digest}"
+    ).hexdigest()

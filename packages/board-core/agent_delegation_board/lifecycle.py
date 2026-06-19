@@ -12,10 +12,17 @@ class BoardLifecycleError(ValueError):
 
 
 def publish_task(store, task, actor_identity_id):
-    validate_task(task)
     actor = store.get_identity(actor_identity_id)
     check_identity_capability(actor, "publish_task")
     assert_identity_owns_task(actor_identity_id, task, "principal_identity_id")
+    if hasattr(store, "assign_task_identity"):
+        task = store.assign_task_identity(dict(task))
+        if task.pop("_idempotent_existing", False):
+            existing = store.load_task(task["task_id"])
+            assert_identity_owns_task(actor_identity_id, existing, "principal_identity_id")
+            return existing
+    task["status"] = "published"
+    validate_task(task)
     _assert_task_identity(store, task["contractor_identity_id"], "contractor")
     if task.get("board_identity_id"):
         _assert_task_identity(store, task["board_identity_id"], "board")

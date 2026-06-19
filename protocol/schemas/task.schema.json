@@ -4,7 +4,22 @@
   "type": "object",
   "required": ["task_id", "title", "principal_identity_id", "contractor_identity_id", "status", "board_protocol_version"],
   "properties": {
-    "task_id": {"type": "string"},
+    "task_id": {
+      "type": "string",
+      "description": "Canonical board-generated task id. Principals must not choose this value for new tasks."
+    },
+    "client_request_id": {
+      "type": "string",
+      "description": "Principal-owned request tracking id. Not a primary key."
+    },
+    "idempotency_key": {
+      "type": "string",
+      "description": "Principal-provided idempotency key used by the board to return an existing task_id for duplicate submissions."
+    },
+    "legacy_task_id": {
+      "type": "string",
+      "description": "Compatibility alias for imported tasks from pre-board-generated task id systems."
+    },
     "title": {"type": "string"},
     "principal_identity_id": {"type": "string"},
     "contractor_identity_id": {"type": "string"},
@@ -17,4 +32,3 @@
   },
   "additionalProperties": true
 }
-

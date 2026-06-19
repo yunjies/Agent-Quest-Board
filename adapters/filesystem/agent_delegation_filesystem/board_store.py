@@ -12,6 +12,7 @@ from agent_delegation_board import (
     validate_identity,
     validate_task,
 )
+from agent_delegation_board.task_identity import generate_task_id
 from agent_delegation_board.lifecycle import (
     approve_task as lifecycle_approve_task,
     claim_task as lifecycle_claim_task,
@@ -71,6 +72,31 @@ class FilesystemBoardStore:
             raise PermissionError(f"identity is not active: {identity_id}")
         return identity
 
+    def assign_task_identity(self, task):
+        """Assign the canonical board-owned task_id before publication.
+
+        Principals submit drafts with client_request_id/idempotency_key. Existing
+        task_id values are kept only for legacy/import compatibility.
+        """
+        if task.get("task_id"):
+            task.setdefault("legacy_task_id", task["task_id"])
+            return task
+
+        principal_id = task.get("principal_identity_id", "")
+        idempotency_key = task.get("idempotency_key")
+        if idempotency_key:
+            existing_id = self._lookup_idempotency(principal_id, idempotency_key)
+            if existing_id and self.task_exists(existing_id):
+                task["task_id"] = existing_id
+                task["_idempotent_existing"] = True
+                return task
+
+        task["task_id"] = generate_task_id()
+        task["task_id_source"] = "board_generated"
+        if idempotency_key:
+            self._record_idempotency(principal_id, idempotency_key, task["task_id"])
+        return task
+
     def create_active_task(self, task):
         validate_task(task)
         task_id = _require_task_id(task)
@@ -80,6 +106,9 @@ class FilesystemBoardStore:
             raise FilesystemBoardError(f"task already exists: {task_id}")
         _write_json(active_path, task)
         return active_path
+
+    def task_exists(self, task_id):
+        return self._active_task_path(task_id).exists() or self._closed_task_path(task_id).exists()
 
     def load_task(self, task_id):
         active_path = self._active_task_path(task_id)
@@ -146,6 +175,19 @@ class FilesystemBoardStore:
     def _event_path(self, task_id):
         return self.root / "events" / f"{task_id}.jsonl"
 
+    def _idempotency_path(self):
+        return self.root / "registry" / "idempotency.json"
+
+    def _lookup_idempotency(self, principal_identity_id, idempotency_key):
+        registry = _read_json(self._idempotency_path())
+        return registry.get(_idempotency_registry_key(principal_identity_id, idempotency_key))
+
+    def _record_idempotency(self, principal_identity_id, idempotency_key, task_id):
+        registry_path = self._idempotency_path()
+        registry = _read_json(registry_path)
+        registry[_idempotency_registry_key(principal_identity_id, idempotency_key)] = task_id
+        _write_json(registry_path, registry)
+
 
 def init_board(root):
     root_path = Path(root)
@@ -153,6 +195,7 @@ def init_board(root):
         (root_path / relative).mkdir(parents=True, exist_ok=True)
     _ensure_json(root_path / "registry" / "agents.json", {})
     _ensure_json(root_path / "registry" / "identities.json", {})
+    _ensure_json(root_path / "registry" / "idempotency.json", {})
     return root_path
 
 
@@ -268,6 +311,10 @@ def _require_task_id(task):
     if not task_id:
         raise FilesystemBoardError("task_id is required")
     return task_id
+
+
+def _idempotency_registry_key(principal_identity_id, idempotency_key):
+    return f"{principal_identity_id}:{idempotency_key}"
 
 
 def _ensure_json(path, default):

@@ -1,5 +1,8 @@
 {
-  "task_id": "task-example-001",
+  "task_id": "aq_20260619T112015432Z_K7P3",
+  "client_request_id": "principal-example:example-task",
+  "idempotency_key": "example-idempotency-key",
+  "legacy_task_id": "task-example-001",
   "title": "Example task",
   "principal_identity_id": "principal-example",
   "contractor_identity_id": "contractor-example",
@@ -10,4 +13,3 @@
   "acceptance_level": "smoke_required",
   "artifacts": {}
 }
-

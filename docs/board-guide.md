@@ -87,3 +87,30 @@ Lark、AgentOps、数据库或其他公告板承载实现应复用同一个 life
 - 只处理状态、事件、权限、通知、落盘。
 
 当前 `adapters/filesystem` 是无飞书模式下的基础事实源实现，可作为多多侧 Lark adapter 的对照实现。
+## Task Identity Rules
+
+公告板拥有 canonical `task_id` 的生成权。`publish_task` 必须把甲方提交的 draft 转换为 published task snapshot，并写入：
+
+```text
+task_id
+task_id_source
+status=published
+event log
+idempotency mapping
+```
+
+推荐 ID 格式：
+
+```text
+aq_YYYYMMDDTHHMMSSmmmZ_RAND
+```
+
+示例：
+
+```text
+aq_20260619T112015432Z_K7P3
+```
+
+公告板必须支持 `idempotency_key`。同一 `principal_identity_id + idempotency_key` 重复发布时，应返回既有 `task_id`，避免重复建单和重复创建话题。
+
+公告板可以接受导入旧任务的 `legacy_task_id`，但新任务主键只能由公告板生成。

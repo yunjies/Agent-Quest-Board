@@ -95,3 +95,14 @@ examples/integrations/   Codex、Hermes、多多、Lark 接入案例
 ## Public 仓库安全规则
 
 不要提交真实 chat_id、API key、token、NAS 路径或用户本地配置。所有示例都使用 `.example.json` 或 `.example.yaml`。
+## 任务 ID 规则
+
+新任务的 canonical `task_id` 由公告板生成，不由甲方或乙方生成。甲方提交 task draft，并携带 `client_request_id` 与 `idempotency_key`；公告板发布任务后返回全系统主键 `task_id`。
+
+当前推荐格式：
+
+```text
+aq_YYYYMMDDTHHMMSSmmmZ_RAND
+```
+
+旧的日期序号或本地编号只能作为 `legacy_task_id` 兼容字段，不再作为新任务主键。

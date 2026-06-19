@@ -52,12 +52,6 @@ def main():
         )
     )
 
-    output_path = Path(args.output)
-    output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(
-        json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
-        encoding="utf-8",
-    )
     if args.board_root:
         if args.register_example_identities:
             _register_example_identities(
@@ -66,8 +60,15 @@ def main():
                 args.contractor_id,
                 args.board_id,
             )
-        publish_task(args.board_root, payload, args.principal_id)
-    print(payload["task_id"])
+        payload = publish_task(args.board_root, payload, args.principal_id)
+
+    output_path = Path(args.output)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    output_path.write_text(
+        json.dumps(payload, ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    print(payload.get("task_id") or payload["client_request_id"])
 
 
 def _register_example_identities(board_root, principal_id, contractor_id, board_id):

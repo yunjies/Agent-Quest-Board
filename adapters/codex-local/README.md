@@ -42,3 +42,10 @@ python adapters/codex-local/codex_principal.py \
 - 不要求仓库配置 API key。
 - 不写入真实本地路径。
 - 不绕过公告板直接关闭任务。
+## Task Identity
+
+Without `--board-root`, this adapter writes a principal draft and does not include canonical `task_id`.
+
+With `--board-root`, the adapter calls the filesystem board `publish_task` flow and writes the returned published task, including board-generated `task_id`.
+
+Codex-side automation must persist that returned `task_id` before review, reject, or score operations.
