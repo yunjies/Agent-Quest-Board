@@ -175,5 +175,104 @@ class LarkTopicBoardTest(unittest.TestCase):
             board.execute_task  # type: ignore
 
 
+class CanonicalTaskIdLarkBoardTest(unittest.TestCase):
+    """LarkTopicBoard works with board-generated canonical aq_* task IDs."""
+
+    CANONICAL_ID = "aq_20260619T112015432Z_K7P3"
+    CANONICAL_ID_2 = "aq_20260619T112015432Z_X9B2"
+
+    def test_canonical_task_id_topic_mapping(self):
+        board = LarkTopicBoard(mapping_store=tempfile.mktemp(suffix=".json"))
+        board.assign_topic(self.CANONICAL_ID, "topic-aq-001")
+        entry = board.get_topic_for_task(self.CANONICAL_ID)
+        self.assertEqual(entry["topic_id"], "topic-aq-001")
+        self.assertEqual(entry["status"], "active")
+
+    def test_canonical_task_id_display_title(self):
+        board = LarkTopicBoard(mapping_store=tempfile.mktemp(suffix=".json"))
+        board.assign_topic(self.CANONICAL_ID, "topic-aq-001")
+
+        event = _event("task_published", task_id=self.CANONICAL_ID, extra_payload={"title": "My task"})
+        task = {"task_id": self.CANONICAL_ID, "title": "My task"}
+        notif = board.handle_event(event, task=task)
+
+        self.assertIsNotNone(notif)
+        self.assertIn(self.CANONICAL_ID, notif["display_title"])
+        self.assertIn("My task", notif["display_title"])
+
+    def test_canonical_task_id_full_lifecycle(self):
+        board = LarkTopicBoard(mapping_store=tempfile.mktemp(suffix=".json"))
+
+        # Publish
+        notif = board.handle_event(
+            _event("task_published", task_id=self.CANONICAL_ID, extra_payload={"title": "Canonical test"}),
+            task={"task_id": self.CANONICAL_ID, "title": "Canonical test"},
+        )
+        self.assertIsNotNone(notif)
+        self.assertTrue(notif["needs_topic_creation"])
+
+        # Assign topic
+        board.assign_topic(self.CANONICAL_ID, "topic-aq-lifecycle")
+        self.assertTrue(board.is_topic_active(self.CANONICAL_ID))
+
+        # Result submitted
+        notif = board.handle_event(
+            _event("result_submitted", task_id=self.CANONICAL_ID),
+            task={"task_id": self.CANONICAL_ID, "title": "Canonical test"},
+        )
+        self.assertEqual(notif["route"], "notify_principal")
+        self.assertEqual(notif["status_label"], "待验收")
+
+        # Review approved
+        notif = board.handle_event(
+            _event("review_approved", task_id=self.CANONICAL_ID),
+            task={"task_id": self.CANONICAL_ID, "title": "Canonical test"},
+        )
+        self.assertTrue(notif["pending_close"])
+
+        # Close
+        notif = board.handle_event(
+            _event("task_closed", task_id=self.CANONICAL_ID),
+        )
+        self.assertTrue(notif["logical_close"])
+        self.assertFalse(board.is_topic_active(self.CANONICAL_ID))
+
+    def test_canonical_task_id_with_idempotent_topic(self):
+        board = LarkTopicBoard(mapping_store=tempfile.mktemp(suffix=".json"))
+        board.assign_topic(self.CANONICAL_ID, "topic-aq-001")
+
+        # Second assignment to same task_id should succeed
+        board.assign_topic(self.CANONICAL_ID, "topic-aq-002")
+        entry = board.get_topic_for_task(self.CANONICAL_ID)
+        self.assertEqual(entry["topic_id"], "topic-aq-002")
+
+    def test_legacy_task_id_format_still_works(self):
+        """aq_* format is a new feature; legacy task-xxx format must still work."""
+        board = LarkTopicBoard(mapping_store=tempfile.mktemp(suffix=".json"))
+        board.assign_topic("task-legacy-001", "topic-legacy")
+        self.assertTrue(board.is_topic_active("task-legacy-001"))
+        entry = board.get_topic_for_task("task-legacy-001")
+        self.assertEqual(entry["topic_id"], "topic-legacy")
+
+    def test_multiple_canonical_ids_can_coexist(self):
+        board = LarkTopicBoard(mapping_store=tempfile.mktemp(suffix=".json"))
+        board.assign_topic(self.CANONICAL_ID, "topic-aq-001")
+        board.assign_topic(self.CANONICAL_ID_2, "topic-aq-002")
+        self.assertEqual(
+            board.get_topic_for_task(self.CANONICAL_ID)["topic_id"], "topic-aq-001"
+        )
+        self.assertEqual(
+            board.get_topic_for_task(self.CANONICAL_ID_2)["topic_id"], "topic-aq-002"
+        )
+
+    def test_canonical_task_id_closes_properly(self):
+        board = LarkTopicBoard(mapping_store=tempfile.mktemp(suffix=".json"))
+        board.assign_topic(self.CANONICAL_ID, "topic-aq-close")
+        board.close_topic(self.CANONICAL_ID)
+        self.assertFalse(board.is_topic_active(self.CANONICAL_ID))
+        entry = board.get_topic_for_task(self.CANONICAL_ID)
+        self.assertEqual(entry["status"], "closed")
+
+
 if __name__ == "__main__":
     unittest.main()
